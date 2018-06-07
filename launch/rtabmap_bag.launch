@@ -42,7 +42,7 @@
   <arg name="database_path"           default="~/.ros/rtabmap.db"/>
   <arg name="queue_size"              default="10"/>
   <arg name="wait_for_transform"      default="0.2"/>
-  <arg name="args"                    default="--delete_db_on_start"/>   <!-- delete_db_on_start, udebug -->
+  <arg name="args"                    default=""/>   <!-- delete_db_on_start, udebug -->
   <arg name="rtabmap_args"            default="$(arg args)"/>   <!-- deprecated, use "args" argument -->
   <arg name="launch_prefix"           default=""/>              <!-- for debugging purpose, it fills launch-prefix tag of the nodes -->
   <arg name="output"                  default="screen"/>        <!-- Control node output (screen or log) -->
@@ -80,7 +80,7 @@
 
   <arg name="compressed"              default="true"/>         <!-- If you want to subscribe to compressed image topics -->
   <arg name="rgb_image_transport"     default="compressed"/>    <!-- Common types: compressed, theora (see "rosrun image_transport list_transports") -->
-  <arg name="depth_image_transport"   default="compressedDepth"/>  <!-- Common types: compressed, theora (see "rosrun image_transport list_transports") -->
+  <arg name="depth_image_transport"   default="raw"/>  <!-- Common types: compressed, theora (see "rosrun image_transport list_transports") -->
 
   <arg name="subscribe_scan"          default="false"/>
   <arg name="scan_topic"              default="/scan"/>
@@ -182,6 +182,8 @@
           <param name="guess_frame_id"              type="string" value="$(arg odom_guess_frame_id)"/>
           <param name="guess_min_translation"       type="double" value="$(arg odom_guess_min_translation)"/>
           <param name="guess_min_rotation"          type="double" value="$(arg odom_guess_min_rotation)"/>
+          <param name="publish_null_when_lost"      type="bool"   value="false"/>
+          <param name="Odom/ResetCountdown"         type="double" value="1"/>
         </node>
 
         <!-- Stereo Odometry -->
@@ -230,6 +232,8 @@
     <!-- Visual SLAM (robot side) -->
     <!-- args: "delete_db_on_start" and "udebug" -->
     <node name="rtabmap" pkg="rtabmap_ros" type="rtabmap" output="$(arg output)" args="$(arg rtabmap_args)" launch-prefix="$(arg launch_prefix)">
+      
+      <param name="Rtabmap/StartNewMapOnLoopClosure" type="bool" value="false"/>
       <param     if="$(arg stereo)" name="subscribe_depth"  type="bool" value="false"/>
       <param unless="$(arg stereo)" name="subscribe_depth"  type="bool" value="true"/>
       <param name="subscribe_rgbd"       type="bool"   value="$(arg subscribe_rgbd)"/>
