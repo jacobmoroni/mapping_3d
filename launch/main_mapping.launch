@@ -7,11 +7,11 @@
 
     <!--Launch Realsense and RTAB Map-->
   <include file="$(find mapping_3d)/launch/d435.launch"/>
-  <include file="$(find mapping_3d)/launch/leo_rtab.launch"/>
+  <include file="$(find mapping_3d)/launch/tuned_rtab.launch"/>
 
   <!--Record -->
   <node if="$(arg record_bag)" name ="record" pkg="rosbag" type ="record" args="-O $(arg name)
-     camera/aligned_depth_to_color/image_raw/compressedDepth
+     camera/aligned_depth_to_color/image_raw
      camera/color/image_rect_color/compressed
      camera/color/camera_info
      camera/depth/camera_info

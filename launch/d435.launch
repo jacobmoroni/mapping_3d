@@ -66,11 +66,11 @@ Processing enabled by this node:
   <arg name="color_height"        default="480"/>
   <arg name="enable_color"        default="true"/>
 
-  <arg name="fisheye_fps"         default="30"/>
-  <arg name="depth_fps"           default="30"/>
-  <arg name="infra1_fps"          default="30"/>
-  <arg name="infra2_fps"          default="30"/>
-  <arg name="color_fps"           default="30"/>
+  <arg name="fisheye_fps"         default="60"/>
+  <arg name="depth_fps"           default="60"/>
+  <arg name="infra1_fps"          default="60"/>
+  <arg name="infra2_fps"          default="60"/>
+  <arg name="color_fps"           default="60"/>
   <arg name="gyro_fps"            default="1000"/>
   <arg name="accel_fps"           default="1000"/>
   <arg name="enable_imu"          default="true"/>
@@ -79,7 +79,7 @@ Processing enabled by this node:
   <arg name="enable_pointcloud"   default="true"/>
   <arg name="enable_sync"         default="true"/>
   <arg name="align_depth"         default="true"/>
-  <!-- <arg name="align_depth"         default="false"/> -->
+  <!--<arg name="align_depth"         default="false"/> -->
 
 
   <!-- rgbd_launch specific arguments -->
