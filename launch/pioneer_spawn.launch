@@ -2,6 +2,7 @@
 
   <arg name="mav_name"       default="slammer"/>
   <arg name="world_file"     default="willowgarage_detail3.world"/>
+  <!--<arg name="world_file"     default="detail_world.world"/>-->
   <arg name="x"              default="0.0"/>
   <arg name="y"              default="0.0"/>
   <arg name="z"              default="0.08"/>
@@ -66,5 +67,7 @@
     <!-- <node pkg="ekf_slam" type="ekf_slam2D.py" name="estimator_slam"/> -->
 
   </group>
-  <node name="camera_base_tf" pkg="tf" type="static_transform_publisher" args="0 0 0 0 0 0 1 camera_link camera_base_link 100"/>
+  <node name="camera_base_tf" pkg="tf" type="static_transform_publisher" args="0 0 0 0.5 -0.5 0.5 -0.5 camera_link camera_base_link 100"/>
+  
+  <node name="laser_base_tf" pkg="tf" type="static_transform_publisher" args="0 0 0.1 0 0 0 1 camera_link slammer/slammer/base_laser_link 100"/>
 </launch>

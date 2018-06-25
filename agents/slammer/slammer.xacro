@@ -110,4 +110,11 @@ Author: James Jackson
     <!--<origin xyz="0.1 0.0 -0.20" rpy="0.0 0.0 0.0"/>-->
   </xacro:xtion>
 
+  <xacro:RPLIDAR-A2
+    namespace="${namespace}"
+    parent_link="${namespace}/base_link"
+    visualize = "false">
+    <origin xyz="0.0 0.0 0.1" rpy="0.0 0.0 0.0"/>
+  </xacro:RPLIDAR-A2>
+
 </robot>

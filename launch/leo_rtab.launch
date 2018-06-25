@@ -81,8 +81,8 @@
   <arg name="rgb_image_transport"     default="compressed"/>    <!-- Common types: compressed, theora (see "rosrun image_transport list_transports") -->
   <arg name="depth_image_transport"   default="compressedDepth"/>  <!-- Common types: compressed, theora (see "rosrun image_transport list_transports") -->
 
-  <arg name="subscribe_scan"          default="false"/>
-  <arg name="scan_topic"              default="/leo/scan"/>
+  <arg name="subscribe_scan"          default="true"/>
+  <arg name="scan_topic"              default="/slammer/slammer/scan"/>
   <arg name="subscribe_scan_cloud"    default="false"/>
   <arg name="scan_cloud_topic"        default="/leo/mergedPointcloud"/>
   <arg name="scan_normal_k"           default="0"/>
@@ -116,12 +116,12 @@
 
   <!-- Nodes -->
   <!-- Kinect cloud to laser scan -->
-  <node pkg="depthimage_to_laserscan" type="depthimage_to_laserscan" name="depthimage_to_laserscan">
-    <remap from="image"     to="/leo/camera/aligned_depth_to_color/image_raw"/>
-    <remap from="camera_info" to="/leo/camera/depth/camera_info"/>
-    <remap from="scan" to="/realsense_scan"/>
-    <param name="range_max" type="double" value="4"/>
-  </node>
+  <!--<node pkg="depthimage_to_laserscan" type="depthimage_to_laserscan" name="depthimage_to_laserscan">-->
+    <!--<remap from="image"     to="/leo/camera/aligned_depth_to_color/image_raw"/>-->
+    <!--<remap from="camera_info" to="/leo/camera/depth/camera_info"/>-->
+    <!--<remap from="scan" to="/realsense_scan"/>-->
+    <!--<param name="range_max" type="double" value="4"/>-->
+  <!--</node>-->
 
   <group ns="$(arg namespace)">
 
@@ -183,6 +183,7 @@
           <param name="guess_min_rotation"          type="double" value="$(arg odom_guess_min_rotation)"/>
           <param name="publish_null_when_lost"      type="bool"   value="false"/>
           <param name="Odom/ResetCountdown"         type="double" value="1"/>
+          <param name="Vis/FeatureType"             type="double" value="0"/>
         </node>
 
         <!-- Stereo Odometry -->
@@ -254,7 +255,11 @@
       <param name="config_path"          type="string" value="$(arg cfg)"/>
       <param name="queue_size"           type="int" value="$(arg queue_size)"/>
       <param name="scan_normal_k"        type="int" value="$(arg scan_normal_k)"/>
-      <param name="Grid/FromDepth" type="string" value="true"/>
+      <param name="Grid/FromDepth" type="string" value="false"/>
+
+      <!--my own params-->
+      <param name="Kp/DetectorStrategy" type="string" value="1"/>
+      <param name="Vis/FeatureType"     type="double" value="1"/>
 
       <remap from="rgb/image"       to="$(arg rgb_topic_relay)"/>
       <remap from="depth/image"     to="$(arg depth_topic_relay)"/>
