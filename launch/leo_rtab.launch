@@ -50,18 +50,19 @@
   <arg     if="$(arg stereo)" name="approx_sync"  default="false"/>
   <arg unless="$(arg stereo)" name="approx_sync"  default="true"/>
 
-  <!-- RGB-D related topics -->
+  <!-- RGB-D related topics for simulation-->
   <arg name="rgb_topic"               default="/slammer/camera/rgb/image_raw" />
   <arg name="depth_topic"             default="/slammer/camera/depth/image_raw" /> 
   <arg name="camera_info_topic"       default="/slammer/camera/rgb/camera_info" />
   <arg name="depth_camera_info_topic" default="/slammer/camera/depth/camera_info" />
 
-  <!-- <arg name="rgb_topic"               default="/camera/color/image_rect_color" /> -->
+
+  <!-- RGB-D related topics for bag REMEMBER to set compressed parameter-->
+  <!--<arg name="rgb_topic"                default="/camera/color/image_rect_color" /> -->
   <!--<arg name="depth_topic"             default="/camera/aligned_depth_to_color/image_raw" />-->
-  <!-- <arg name="depth_topic"             default="/camera/depth/image_rect_raw" /> -->
-  <!-- <arg name="depth_topic"             default="/camera/depth/color/points" /> -->
-  <!-- <arg name="camera_info_topic"       default="/camera/color/camera_info" /> -->
-  <!-- <arg name="depth_camera_info_topic" default="/camera/depth/camera_info" /> -->
+  <!--<arg name="camera_info_topic"       default="/camera/color/camera_info" /> -->
+  <!--<arg name="depth_camera_info_topic" default="/camera/aligned_depth_to_color/camera_info" /> -->
+  <!--<arg name="depth_camera_info_topic" default="/camera/depth/camera_info" /> -->
 
   <!-- stereo related topics -->
   <arg name="stereo_namespace"        default="/stereo_camera"/>
@@ -77,9 +78,9 @@
   <arg name="rgbd_topic"              default="rgbd_image" />
   <arg name="depth_scale"             default="1.0" />
 
-  <arg name="compressed"              default="false"/>         <!-- If you want to subscribe to compressed image topics -->
+  <arg name="compressed"              default="true"/>         <!-- If you want to subscribe to compressed image topics -->
   <arg name="rgb_image_transport"     default="compressed"/>    <!-- Common types: compressed, theora (see "rosrun image_transport list_transports") -->
-  <arg name="depth_image_transport"   default="compressedDepth"/>  <!-- Common types: compressed, theora (see "rosrun image_transport list_transports") -->
+  <arg name="depth_image_transport"   default="raw"/>  <!-- Common types: compressed, theora (see "rosrun image_transport list_transports") -->
 
   <arg name="subscribe_scan"          default="true"/>
   <arg name="scan_topic"              default="/slammer/slammer/scan"/>
@@ -88,7 +89,7 @@
   <arg name="scan_normal_k"           default="0"/>
 
   <arg name="visual_odometry"          default="true"/>          <!-- Launch rtabmap visual odometry node -->
-  <arg name="icp_odometry"             default="false"/>         <!-- Launch rtabmap icp odometry node -->
+  <arg name="icp_odometry"             default="true"/>         <!-- Launch rtabmap icp odometry node -->
   <arg name="odom_topic"               default="odom"/>          <!-- Odometry topic name -->
   <arg name="vo_frame_id"              default="$(arg odom_topic)"/> <!-- Visual/Icp odometry frame ID for TF -->
   <arg name="odom_tf_angular_variance" default="1"/>             <!-- If TF is used to get odometry, this is the default angular variance -->
@@ -227,6 +228,7 @@
       <param name="guess_frame_id"              type="string" value="$(arg odom_guess_frame_id)"/>
       <param name="guess_min_translation"       type="double" value="$(arg odom_guess_min_translation)"/>
       <param name="guess_min_rotation"          type="double" value="$(arg odom_guess_min_rotation)"/>
+      <param name="Reg/Strategy"                type="double" value="2"/>
     </node>
 
     <!-- Visual SLAM (robot side) -->
@@ -260,6 +262,8 @@
       <!--my own params-->
       <param name="Kp/DetectorStrategy" type="string" value="1"/>
       <param name="Vis/FeatureType"     type="double" value="1"/>
+      <!--Reg/Strategy: 0=Vis 1=icp 2=vis/icp-->
+      <param name="Reg/Strategy"        type="double" value="2"/> 
 
       <remap from="rgb/image"       to="$(arg rgb_topic_relay)"/>
       <remap from="depth/image"     to="$(arg depth_topic_relay)"/>
