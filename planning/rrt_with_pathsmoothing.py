@@ -10,6 +10,7 @@ import random
 import math
 import copy
 
+# from ipdb import set_trace
 import numpy as np
 import cv2
 
@@ -21,7 +22,7 @@ class RRT():
     Class for RRT Planning
     """
 
-    def __init__(self, start, goal, obstacleList, randArea, expandDis=1.0, goalSampleRate=5, maxIter=500):
+    def __init__(self, start, goal, obstacleList, randArea, expandDis=0.1, goalSampleRate=20, maxIter=500):
         """
         Setting Parameter
 
@@ -33,8 +34,10 @@ class RRT():
         """
         self.start = Node(start[0], start[1])
         self.end = Node(goal[0], goal[1])
-        self.minrand = randArea[0]
-        self.maxrand = randArea[1]
+        self.minxrand = randArea[0]
+        self.maxxrand = randArea[1]
+        self.minyrand = randArea[2]
+        self.maxyrand = randArea[3]
         self.expandDis = expandDis
         self.goalSampleRate = goalSampleRate
         self.maxIter = maxIter
@@ -51,8 +54,8 @@ class RRT():
         while True:
             # Random Sampling
             if random.randint(0, 100) > self.goalSampleRate:
-                rnd = [random.uniform(self.minrand, self.maxrand), random.uniform(
-                    self.minrand, self.maxrand)]
+                rnd = [random.uniform(self.minxrand, self.maxxrand), random.uniform(
+                    self.minyrand, self.maxyrand)]
             else:
                 rnd = [self.end.x, self.end.y]
 
@@ -108,7 +111,9 @@ class RRT():
 
         plt.plot(self.start.x, self.start.y, "xr")
         plt.plot(self.end.x, self.end.y, "xr")
-        plt.axis([-2, 15, -2, 15])
+        # plt.axis([0, 15, 0, 30])
+        # plt.axis([1, 6, 1, 5])
+        plt.axis([self.minxrand,self.maxxrand,self.minyrand,self.maxyrand])
         plt.grid(True)
         plt.pause(0.01)
 
@@ -252,9 +257,11 @@ def PathSmoothing(path, maxIter, obstacleList):
 def main():
     # ====Search Path with RRT====
     # Parameter
-    obstacleList = generate_obstacles('lab_map.png')  # [x,y,size]
-    rrt = RRT(start=[0, 0], goal=[5, 10],
-              randArea=[-2, 15], obstacleList=obstacleList)
+    obstacleList,xmin,xmax,ymin,ymax = generate_obstacles('lab_map.png')  # [x,y,size]
+    # obstacleList,xmin,xmax,ymin,ymax = generate_obstacles('maze1.jpg')  # [x,y,size]
+    rrt = RRT(start=[5, 25], goal=[10, 5],
+    # rrt = RRT(start=[2, 5], goal=[5.3, 1.3],
+              randArea=[xmin, xmax, ymin, ymax], obstacleList=obstacleList)
     path = rrt.Planning(animation=show_animation)
 
     # Path smoothing
@@ -270,13 +277,15 @@ def main():
             y for (x, y) in smoothedPath], '-b')
 
         plt.grid(True)
-        plt.pause(0.01)  # Need for Mac
+        plt.pause(0.001)  # Need for Mac
         plt.show()
 
 def generate_obstacles(file):
     map_raw = cv2.imread(file,0)
     # cv2.imshow('raw',map_raw)
+    
     thresh = 10
+    # thresh = 50  #10
     map_bw = cv2.threshold(map_raw, thresh, 255, cv2.THRESH_BINARY)[1]
     map_bw = cv2.bitwise_not(map_bw)
     # cv2.imshow ('bw',map_bw)
@@ -295,17 +304,52 @@ def generate_obstacles(file):
     map_mat = np.array(map_bw)
     obs = np.nonzero(map_mat)
     obs = np.array(obs)
+    px_conv=0.03103
+    print "xmin: " 
+    print min(obs[:,0])*px_conv
+    print "xmax: "
+    print max(obs[:,0])*px_conv
+    print "ymin: "
+    print min(obs[:,1])*px_conv
+    print "ymax: "
+    print max(obs[:,1])*px_conv
 
-    #prune obstacles
-    #TODO add something to pass in less obstacles
+    
 
     #convert pixels to meters
-    px_conv=0.03103
-    ob_list = []
+    # px_conv=0.03103
+    xmin = min(obs[1,:])*px_conv
+    xmax = max(obs[1,:])*px_conv
+    ymin = min(obs[0,:])*px_conv
+    ymax = max(obs[0,:])*px_conv
 
-    for x in obs.T:
+    ob_list = []
+    prox_thresh = 0.2*2
+    # prox_thresh = 0.09*2
+    for i,x in enumerate(obs.T):
         x = x*px_conv
-        ob_list.append((x[0],x[1],0.032))
-    return ob_list
+        if i == 0:
+            ob_list.append((x[1],x[0],0.25))
+            # ob_list.append((x[1],x[0],0.15))
+        else:
+            print (np.float(i)/len(obs.T))
+            min_dist = 1
+            for i in range(0,len(ob_list)):
+                min_dist =min(np.sqrt((x[1]-ob_list[i][0])**2+(x[0]-ob_list[i][1])**2),min_dist)
+            if min_dist > prox_thresh:
+                ob_list.append((x[1],x[0],0.25))
+    
+    # obs_dict = dixt()
+    # obs_dict['obstacles'] = ob_list 
+    # sio.savemat(ob_list)
+    # xmin = 0
+    # xmax = 15
+    # ymin = 0
+    # ymax = 30
+    # xmin = 1
+    # xmax = 6
+    # ymin = 1
+    # ymax = 5
+    return ob_list,xmin,xmax,ymin,ymax
 if __name__ == '__main__':
     main()

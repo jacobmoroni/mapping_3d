@@ -1,12 +1,13 @@
 import numpy as np
 import cv2
-from ipdb import set_trace
-map_raw = cv2.imread('lab_map.png',0)
-# cv2.imshow('raw',map_raw)
-thresh = 10
+# from ipdb import set_trace
+# map_raw = cv2.imread('lab_map.png',0)
+map_raw = cv2.imread('maze1.jpg',0)
+cv2.imshow('raw',map_raw)
+thresh = 50
 map_bw = cv2.threshold(map_raw, thresh, 255, cv2.THRESH_BINARY)[1]
 map_bw = cv2.bitwise_not(map_bw)
-# cv2.imshow ('bw',map_bw)
+cv2.imshow ('bw',map_bw)
 
 #try to clean up noise in the map
 kernel = np.ones((5,5),np.uint8)
@@ -32,11 +33,19 @@ ob_list = []
 prox_thresh = 0.1
 for i,x in enumerate(obs.T):
     x = x*px_conv
-    if i = 0:
-        ob_list.append((x[0],x[1],0.032))
+    if i == 0:
+        ob_list.append((x[0],x[1],0.11))
     else:
+        min_dist = 1
         for i in range(0,len(ob_list)):
-            if np.sqrt((x[0]-ob_list[i][0])**2+(x[1]-ob_list[i][1])**2)>prox_thresh
+            min_dist =min(np.sqrt((x[0]-ob_list[i][0])**2+(x[1]-ob_list[i][1])**2),min_dist)
+        if min_dist > prox_thresh:
+            ob_list.append((x[0],x[1],0.11))
+            # print min_dist
+            # print len(ob_list)
+        else:
+            pass
+            # print "not added"
             #TODO figure out how to do this loop to only add the obstacle if 
             #no other obstacle already added is within the threshold
 
@@ -45,9 +54,9 @@ for i,x in enumerate(obs.T):
 
 
 # #shut down when done
-# k = cv2.waitKey(0)
-# if k == 27:         # wait for ESC key to exit
-    # cv2.destroyAllWindows()
-# elif k == ord('s'): # wait for 's' key to save and exit
-    # cv2.imwrite('messigray.png',img)
-    # cv2.destroyAllWindows()
+k = cv2.waitKey(0)
+if k == 27:         # wait for ESC key to exit
+    cv2.destroyAllWindows()
+elif k == ord('s'): # wait for 's' key to save and exit
+    cv2.imwrite('messigray.png',img)
+    cv2.destroyAllWindows()
