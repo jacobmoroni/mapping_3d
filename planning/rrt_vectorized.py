@@ -10,12 +10,12 @@ import random
 import math
 import copy
 
-# from ipdb import set_trace
+from ipdb import set_trace
 import numpy as np
 import cv2
 
-show_animation = True
-
+show_animation = False
+plot_final = True
 
 class RRT():
     """
@@ -49,9 +49,13 @@ class RRT():
 
         animation: flag for animation on or off
         """
-
+        print "Finding Path" 
+        first_time = True 
         self.nodeList = [self.start]
         while True:
+            if first_time == True:
+                self.DrawGraph()
+                first_time = False
             # Random Sampling
             if random.randint(0, 100) > self.goalSampleRate:
                 rnd = [random.uniform(self.minxrand, self.maxxrand), random.uniform(
@@ -131,15 +135,21 @@ class RRT():
         return minind
 
     def __CollisionCheck(self, node, obstacleList):
+        dobs = obstacleList - [node.x,node.y,0]
+        dist = np.sqrt(dobs[:,0]**2+dobs[:,1]**2)
+        size = obstacleList[:,2]
+        if min(dist-size)<0:
+            return False #collision
+        else:
+            return True #safe
+        # for (ox, oy, size) in obstacleList:
+            # dx = ox - node.x
+            # dy = oy - node.y
+            # d = math.sqrt(dx * dx + dy * dy)
+            # if d <= size:
+                # return False  # collision
 
-        for (ox, oy, size) in obstacleList:
-            dx = ox - node.x
-            dy = oy - node.y
-            d = math.sqrt(dx * dx + dy * dy)
-            if d <= size:
-                return False  # collision
-
-        return True  # safe
+        # return True  # safe
 
 
 class Node():
@@ -199,26 +209,45 @@ def LineCollisionCheck(first, second, obstacleList):
 
     try:
         a = y2 - y1
-        b = -(x2 - x1)
-        c = y2 * (x2 - x1) - x2 * (y2 - y1)
+        b = x2 - x1 
+        # c = y2 * (x2 - x1) - x2 * (y2 - y1)
+        c = x2*y1 - y2*x1
     except ZeroDivisionError:
         return False
-
-    for (ox, oy, size) in obstacleList:
-        d = abs(a * ox + b * oy + c) / (math.sqrt(a * a + b * b))
-        if d <= (size):
+    dist = abs(a*obstacleList[:,0]-b*obstacleList[:,1]+c)/np.sqrt(a*a+b*b)-obstacleList[:,2]
+    prox = np.bitwise_not(np.bitwise_and(
+            np.bitwise_or(
+                np.bitwise_and(obstacleList[:,0]<x2 ,obstacleList[:,0]<x1),
+                np.bitwise_and(obstacleList[:,0]>x2,obstacleList[:,0]>x1)),
+            np.bitwise_or(
+                np.bitwise_and(obstacleList[:,1]<y2,obstacleList[:,1]<y1),
+                np.bitwise_and(obstacleList[:,1]>y2,obstacleList[:,1]>y1))))
+    # set_trace()  
+    if dist[prox].size > 0:
+        if min(dist[prox])<=0:
             return False
+        else:
+            return True
+
+    # for (ox, oy, size) in obstacleList:
+        # d = abs(a * ox + b * oy + c) / (math.sqrt(a * a + b * b))
+        # if d <= (size):
+            # return False
 
     #  print("OK")
 
-    return True  # OK
+    # return True  # OK
 
 
 def PathSmoothing(path, maxIter, obstacleList):
-    #  print("PathSmoothing")
-
+    print "PathSmoothing"
     le = GetPathLength(path)
-
+    # first = [0,0,0]
+    # pickPoints = [0,le]
+    # while first[2]<len(path):
+        # first = GetTargetPoint(path,PickPoints[0])
+        # second = GetTargetPoint(path,PickPoints[1])
+        # if LineCollisionCheck(first,second,obstacleList)
     for i in range(maxIter):
         # Sample two points
         pickPoints = [random.uniform(0, le), random.uniform(0, le)]
@@ -241,7 +270,6 @@ def PathSmoothing(path, maxIter, obstacleList):
         # collision check
         if not LineCollisionCheck(first, second, obstacleList):
             continue
-
         # Create New path
         newPath = []
         newPath.extend(path[:first[2] + 1])
@@ -254,13 +282,153 @@ def PathSmoothing(path, maxIter, obstacleList):
     return path
 
 
+class SelectStart:
+    def __init__(self, line, file, px_conv,bw_thresh):
+        self.line = line
+        # self.xs = list(line.get_xdata())
+        # self.ys = list(line.get_xdata())
+        self.xs = [0,0]
+        self.ys = [0,0]
+        self.cid = line.figure.canvas.mpl_connect('button_press_event', self)
+        self.node = 0
+        self.start = [0,0]
+        self.goal = [0,0]
+        self.xmin = 0
+        self.ymin = 0
+        self.xmax = 0
+        self.ymax = 0
+        self.px_conv = px_conv
+        self.bw_thresh = bw_thresh
+        self.file = file
+
+        self.generate_obstacles()
+        self.PlotObs()
+    def __call__(self, event):
+        # print('click', event)
+        if event.inaxes!=self.line.axes: return
+       
+        if self.node == 0:
+            self.xs[0] = event.xdata
+            self.ys[0] = event.ydata
+            self.start=[event.xdata,event.ydata]
+            print "starting point selected: x= ",event.xdata," y= ", event.ydata 
+            self.node = 1
+        else:
+            self.xs[1] = event.xdata
+            self.ys[1] = event.ydata
+            self.goal = [event.xdata,event.ydata]
+            print "goal selected: x= ",event.xdata," y= ", event.ydata 
+            self.node = 0
+        self.line.set_data(self.xs, self.ys)
+        self.line.figure.canvas.draw()
+        return self.start,self.goal
+
+    def generate_obstacles(self):
+        map_raw = cv2.imread(self.file,0)
+        # thresh = 10 
+        # thresh = 50  #10
+        map_bw = cv2.threshold(map_raw, self.bw_thresh, 255, cv2.THRESH_BINARY)[1]
+        map_bw = cv2.bitwise_not(map_bw)
+
+        #try to clean up noise in the map
+        kernel = np.ones((5,5),np.uint8)
+        # map_bw = cv2.dilate(map_bw,kernel,iterations = 3)
+        # map_bw = cv2.erode(map_bw,kernel,iterations = 3)
+        map_bw = cv2.morphologyEx(map_bw, cv2.MORPH_CLOSE,kernel)
+        map_bw = cv2.morphologyEx(map_bw, cv2.MORPH_CLOSE,kernel)
+        # map_bw = cv2.morphologyEx(map_bw, cv2.MORPH_OPEN,kernel)
+        # cv2.imshow('bw_d',map_bw)
+
+
+        #convert to array to begin generating obstacles
+        map_mat = np.array(map_bw)
+        obs = np.nonzero(map_mat)
+        obs = np.array(obs)
+        # self.px_conv=0.03103
+
+        #convert pixels to meters
+        obs = obs.T*self.px_conv
+        
+        #prune obstacles by rounding
+        obs = np.round_(obs,1)
+        obs = np.unique(obs,axis = 0)
+        
+        #add sizes to obstacles
+        sizes = np.ones([1,len(obs)])*.1
+        obs = np.append(obs.T,sizes,axis=0).T
+
+        self.obs = obs[:,np.argsort([1,0,2])] #rearange so obstacles are [[x,y,size]]
+
+        #find min and max on map
+        self.xmin = min(self.obs[:,0])
+        self.xmax = max(self.obs[:,0])
+        self.ymin = min(self.obs[:,1])
+        self.ymax = max(self.obs[:,1])
+       
+        print "xmin: ",self.xmin
+        print "xmax: ",self.xmax
+        print "ymin: ",self.ymin
+        print "ymax: ",self.ymax 
+
+        # ob_list = []
+        # prox_thresh = 0.2*2
+        # # prox_thresh = 0.09*2
+        # for i,x in enumerate(obs.T):
+            # x = x*px_conv
+            # if i == 0:
+                # ob_list.append([x[1],x[0],0.25])
+                # # ob_list.append((x[1],x[0],0.15))
+            # else:
+                # print (np.float(i)/len(obs.T))
+                # min_dist = 1
+                # for i in range(0,len(ob_list)):
+                    # min_dist =min(np.sqrt((x[1]-ob_list[i][0])**2+(x[0]-ob_list[i][1])**2),min_dist)
+                # if min_dist > prox_thresh:
+                    # ob_list.append([x[1],x[0],0.25])
+        # select_start(obs,xmin,xmax,ymin,ymax) 
+         # return obs,xmin,xmax,ymin,ymax
+
+    def PlotObs(self): 
+        # fig = plt.figure()
+        # plt.clf()
+        for (x, y, size) in self.obs:
+            self.PlotCircle(x, y, size)
+
+        plt.axis([self.xmin,self.xmax,self.ymin,self.ymax])
+        plt.grid(True)
+        # plt.show() 
+        plt.pause(0.01)
+
+    def PlotCircle(self, x, y, size):
+        deg = list(range(0, 360, 5))
+        deg.append(0)
+        xl = [x + size * math.cos(math.radians(d)) for d in deg]
+        yl = [y + size * math.sin(math.radians(d)) for d in deg]
+        plt.plot(xl, yl, "-k")
+
 def main():
     # ====Search Path with RRT====
     # Parameter
-    obstacleList,xmin,xmax,ymin,ymax = generate_obstacles('lab_map.png')  # [x,y,size]
-    # obstacleList,xmin,xmax,ymin,ymax = generate_obstacles('maze1.jpg')  # [x,y,size]
-    rrt = RRT(start=[5, 25], goal=[10, 5],
-    # rrt = RRT(start=[2, 5], goal=[5.3, 1.3],
+    # obstacleList,xmin,xmax,ymin,ymax = generate_obstacles('lab_map.png')  # [x,y,size]
+   # obstacleList,xmin,xmax,ymin,ymax = generate_obstacles('maze1.jpg')  # [x,y,size]
+
+    fig = plt.figure()
+    ax = fig.add_subplot(111)
+    ax.set_title('Select Start and Goal (Close when finished)')
+    line, = ax.plot([0,0], [0,0],"xr")  # empty line
+    selector = SelectStart(line, file = 'maze1.jpg',px_conv = 0.03103, bw_thresh = 50)
+    # selector = SelectStart(line, file = 'lab_map.png',px_conv = 0.03103, bw_thresh = 10)
+    plt.show()
+
+    start = selector.start
+    goal =  selector.goal
+    obstacleList = selector.obs 
+    xmin = selector.xmin
+    ymin = selector.ymin
+    xmax = selector.xmax
+    ymax = selector.ymax
+
+    rrt = RRT(start, goal,
               randArea=[xmin, xmax, ymin, ymax], obstacleList=obstacleList)
     path = rrt.Planning(animation=show_animation)
 
@@ -269,7 +437,7 @@ def main():
     smoothedPath = PathSmoothing(path, maxIter, obstacleList)
 
     # Draw final path
-    if show_animation:
+    if plot_final:
         rrt.DrawGraph()
         plt.plot([x for (x, y) in path], [y for (x, y) in path], '-r')
 
@@ -280,76 +448,5 @@ def main():
         plt.pause(0.001)  # Need for Mac
         plt.show()
 
-def generate_obstacles(file):
-    map_raw = cv2.imread(file,0)
-    # cv2.imshow('raw',map_raw)
-    
-    thresh = 10
-    # thresh = 50  #10
-    map_bw = cv2.threshold(map_raw, thresh, 255, cv2.THRESH_BINARY)[1]
-    map_bw = cv2.bitwise_not(map_bw)
-    # cv2.imshow ('bw',map_bw)
-
-    #try to clean up noise in the map
-    kernel = np.ones((5,5),np.uint8)
-    # map_bw = cv2.dilate(map_bw,kernel,iterations = 3)
-    # map_bw = cv2.erode(map_bw,kernel,iterations = 3)
-    map_bw = cv2.morphologyEx(map_bw, cv2.MORPH_CLOSE,kernel)
-    map_bw = cv2.morphologyEx(map_bw, cv2.MORPH_CLOSE,kernel)
-    # map_bw = cv2.morphologyEx(map_bw, cv2.MORPH_OPEN,kernel)
-    # cv2.imshow('bw_d',map_bw)
-
-
-    #convert to array to begin generating obstacles
-    map_mat = np.array(map_bw)
-    obs = np.nonzero(map_mat)
-    obs = np.array(obs)
-    px_conv=0.03103
-    print "xmin: " 
-    print min(obs[:,0])*px_conv
-    print "xmax: "
-    print max(obs[:,0])*px_conv
-    print "ymin: "
-    print min(obs[:,1])*px_conv
-    print "ymax: "
-    print max(obs[:,1])*px_conv
-
-    
-
-    #convert pixels to meters
-    # px_conv=0.03103
-    xmin = min(obs[1,:])*px_conv
-    xmax = max(obs[1,:])*px_conv
-    ymin = min(obs[0,:])*px_conv
-    ymax = max(obs[0,:])*px_conv
-
-    ob_list = []
-    prox_thresh = 0.2*2
-    # prox_thresh = 0.09*2
-    for i,x in enumerate(obs.T):
-        x = x*px_conv
-        if i == 0:
-            ob_list.append((x[1],x[0],0.25))
-            # ob_list.append((x[1],x[0],0.15))
-        else:
-            print (np.float(i)/len(obs.T))
-            min_dist = 1
-            for i in range(0,len(ob_list)):
-                min_dist =min(np.sqrt((x[1]-ob_list[i][0])**2+(x[0]-ob_list[i][1])**2),min_dist)
-            if min_dist > prox_thresh:
-                ob_list.append((x[1],x[0],0.25))
-    
-    # obs_dict = dixt()
-    # obs_dict['obstacles'] = ob_list 
-    # sio.savemat(ob_list)
-    # xmin = 0
-    # xmax = 15
-    # ymin = 0
-    # ymax = 30
-    # xmin = 1
-    # xmax = 6
-    # ymin = 1
-    # ymax = 5
-    return ob_list,xmin,xmax,ymin,ymax
 if __name__ == '__main__':
     main()
