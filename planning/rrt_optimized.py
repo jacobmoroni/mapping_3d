@@ -1,7 +1,8 @@
 """
-Path Planning Sample Code with Randomized Rapidly-Exploring Random Trees (RRT)
+Path Planning Code with Randomized Rapidly-Exploring Random Trees (RRT)
 
-@author: AtsushiSakai(@Atsushi_twi)
+@author: Jacob Olson 
+based off of code written by AtsushiSakai(@Atsushi_twi)
 
 """
 
@@ -14,26 +15,60 @@ from ipdb import set_trace
 import numpy as np
 import cv2
 
-show_animation = False
-plot_final = True
-file = "lab_map.png"
-# file = "maze2.png"
-bw_thresh = 10
-obstacleSize = .15
-px_conv = 0.03103
-color_image = False #This sets all unknown grey area to obstacles but slows down plotting
-show_obs_size = False #Use this to speed up plotting, by plotting dots rather than circles
+'''
+Tunable parameters that get passed in to the functions
 
+show_animation ---- show the rrt growing
+plot_final -------- show the final path
+file -------------- file containing the map to be loaded in
+bw_thresh --------- black/white threshold used for extracting obstacles
+obstacleSize ------ radius of obstacles in map
+px_conv ----------- conversion of meters/pixel
+thetadeg ---------- how many degrees to rotate the obstacle map (for adjusting to global map)
+x_shift ----------- how much to shift the map in the x direction
+y_shift ----------- how much to shift the map in the y direction
+z ----------------- Z value for waypoints generated
+color_image ------- Sets all unknown grey area in RTAB-Map occupancy grid to obstacles
+show_obs_size ----- Show Obstacles with radius as circles or without as constant size dots
+waypoint_thresh --- Threshold Distance to prune waypoints at the expandDisi
+
+expandDis --------- Distance to expand the RRT tree each iteration
+goalSampleRate ---- Percent chance of "randomly" sampling goal for RRT
+maxIter ----------- Number of times the path smoothing iterates 
+
+'''
+show_animation = False 
+plot_final = True
+file = "lab_map.png" 
+# file = "maze2.png"
+bw_thresh = 10 
+obstacleSize = .2 
+px_conv = 0.03103 
+thetadeg = 10 
+x_shift = 15 
+y_shift = 30 
+z = -1
+color_image = False 
+show_obs_size = False 
+waypoint_thresh = 0.09
+
+expandDis = 0.15
+goalSampleRate = 20
+maxIter = 1000
+
+#convert theta to radians
+theta = thetadeg*np.pi/180
+
+#change threshold to include unknown areas in map into obstacles
 if color_image:
     bw_thresh = 90
-
 
 class RRT():
     """
     Class for RRT Planning
     """
 
-    def __init__(self, start, goal, obstacleList, randArea, expandDis=0.15, goalSampleRate=20, maxIter=500):
+    def __init__(self, start, goal, randArea, obstacleList, expandDis, goalSampleRate, maxIter):
         """
         Setting Parameter
 
@@ -43,8 +78,8 @@ class RRT():
         randArea:Ramdom Samping Area [min,max]
 
         """
-        self.start = Node(start[0], start[1])
-        self.end = Node(goal[0], goal[1])
+        self.start = [start[0],start[1],None]
+        self.goal = [goal[0],goal[1],None]
         self.minxrand = randArea[0]
         self.maxxrand = randArea[1]
         self.minyrand = randArea[2]
@@ -65,14 +100,16 @@ class RRT():
         self.nodeList = [self.start]
         while True:
             if first_time == True:
+                #Replot before starting
                 self.DrawGraph()
                 first_time = False
+        
             # Random Sampling
             if random.randint(0, 100) > self.goalSampleRate:
                 rnd = [random.uniform(self.minxrand, self.maxxrand), random.uniform(
                     self.minyrand, self.maxyrand)]
             else:
-                rnd = [self.end.x, self.end.y]
+                rnd = [self.goal[0], self.goal[1]]
 
             # Find nearest node
             nind = self.GetNearestListIndex(self.nodeList, rnd)
@@ -80,21 +117,21 @@ class RRT():
 
             # expand tree
             nearestNode = self.nodeList[nind]
-            theta = math.atan2(rnd[1] - nearestNode.y, rnd[0] - nearestNode.x)
+            theta = math.atan2(rnd[1] - nearestNode[1], rnd[0] - nearestNode[0])
 
             newNode = copy.deepcopy(nearestNode)
-            newNode.x += self.expandDis * math.cos(theta)
-            newNode.y += self.expandDis * math.sin(theta)
-            newNode.parent = nind
+            newNode[0] += self.expandDis * math.cos(theta)
+            newNode[1] += self.expandDis * math.sin(theta)
+            newNode[2] = nind
 
             if not self.__CollisionCheck(newNode, self.obstacleList):
                 continue
 
             self.nodeList.append(newNode)
-
+            
             # check goal
-            dx = newNode.x - self.end.x
-            dy = newNode.y - self.end.y
+            dx = newNode[0] - self.goal[0]
+            dy = newNode[1] - self.goal[1]
             d = math.sqrt(dx * dx + dy * dy)
             if d <= self.expandDis:
                 print("Goal!!")
@@ -103,13 +140,14 @@ class RRT():
             if animation:
                 self.DrawGraph(rnd)
 
-        path = [[self.end.x, self.end.y]]
+        #add nodes in final path to path variable
+        path = [[self.goal[0], self.goal[1]]]
         lastIndex = len(self.nodeList) - 1
-        while self.nodeList[lastIndex].parent is not None:
+        while self.nodeList[lastIndex][2] is not None:
             node = self.nodeList[lastIndex]
-            path.append([node.x, node.y])
-            lastIndex = node.parent
-        path.append([self.start.x, self.start.y])
+            path.append([node[0], node[1]])
+            lastIndex = node[2]
+        path.append([self.start[0], self.start[1]])
 
         return path
 
@@ -117,20 +155,22 @@ class RRT():
         plt.clf()
         if rnd is not None:
             plt.plot(rnd[0], rnd[1], "^k")
+
         for node in self.nodeList:
-            if node.parent is not None:
-                plt.plot([node.x, self.nodeList[node.parent].x], [
-                         node.y, self.nodeList[node.parent].y], "-g")
+            if node[2] is not None:
+                plt.plot([node[0], self.nodeList[node[2]][0]], [
+                         node[1], self.nodeList[node[2]][1]], "-g")
         if show_obs_size:
             self.PlotCircle(self.obstacleList[:,0],self.obstacleList[:,1],self.obstacleList[:,2])
-            # for (x, y, size) in self.obstacleList:
-                # self.PlotCircle(x, y, size)
+
         else:
             plt.plot(self.obstacleList[:,0],self.obstacleList[:,1],".k")
 
-        plt.plot(self.start.x, self.start.y, "xr")
-        plt.plot(self.end.x, self.end.y, "xr")
-        plt.axis([self.minxrand,self.maxxrand,self.minyrand,self.maxyrand])
+        plt.plot(self.start[0], self.start[1], "xr")
+        plt.plot(self.goal[0], self.goal[1], "xr")
+        plt.xlim(self.minxrand,self.maxxrand)
+        plt.ylim(self.minyrand,self.maxyrand)
+        plt.axis('scaled')
         plt.grid(True)
         plt.pause(0.01)
 
@@ -142,13 +182,15 @@ class RRT():
         plt.plot(xl, yl, "-k")
 
     def GetNearestListIndex(self, nodeList, rnd):
-        dlist = [(node.x - rnd[0]) ** 2 + (node.y - rnd[1])
-                 ** 2 for node in nodeList]
-        minind = dlist.index(min(dlist))
+        #find nearest node to randomly sampled number and return index of node
+        nodeList = np.array(nodeList)
+        dlist = (nodeList[:,0]-rnd[0]) **2 + (nodeList[:,1]-rnd[1])**2
+        minind = np.argmin(dlist)
         return minind
 
     def __CollisionCheck(self, node, obstacleList):
-        dobs = obstacleList - [node.x,node.y,0]
+        #Check for endpoint collisions with new node
+        dobs = obstacleList - [node[0],node[1],0]
         dist = np.sqrt(dobs[:,0]**2+dobs[:,1]**2)
         size = obstacleList[:,2]
         if min(dist-size)<0:
@@ -156,55 +198,37 @@ class RRT():
         else:
             return True #safe
 
-class Node():
-    """
-    RRT Node
-    """
-
-    def __init__(self, x, y):
-        self.x = x
-        self.y = y
-        self.parent = None
-
-
 def GetPathLength(path):
-    le = 0
-    for i in range(len(path) - 1):
-        dx = path[i + 1][0] - path[i][0]
-        dy = path[i + 1][1] - path[i][1]
-        d = math.sqrt(dx * dx + dy * dy)
-        le += d
+    # return current length of path
+    path = np.array(path)
+    dpath = path - np.roll(path,1,axis=0)
+    dlen = np.sqrt(dpath[:,0]**2+dpath[:,1]**2)
+    le = sum(dlen[1:len(dlen)])
 
     return le
 
 
 def GetTargetPoint(path, targetL):
-    le = 0
-    ti = 0
-    lastPairLen = 0
-    for i in range(len(path) - 1):
-        dx = path[i + 1][0] - path[i][0]
-        dy = path[i + 1][1] - path[i][1]
-        d = math.sqrt(dx * dx + dy * dy)
-        le += d
-        if le >= targetL:
-            ti = i - 1
-            lastPairLen = d
-            break
+    #return location and position of nearest node to randomly sampled length
+    path = np.array(path)
+    dpath = path - np.roll(path,1,axis=0)
+    dlen = np.sqrt(dpath[:,0]**2+dpath[:,1]**2)
+    dlen = dlen[1:len(dlen)]
+    dsum = np.cumsum(dlen)
+    ti = np.argmax(dsum>=targetL)-1
+    lastPairLen = dlen[ti+1]
+    le = dsum[ti+1]
 
     partRatio = (le - targetL) / lastPairLen
-    #  print(partRatio)
-    #  print((ti,len(path),path[ti],path[ti+1]))
 
     x = path[ti][0] + (path[ti + 1][0] - path[ti][0]) * partRatio
     y = path[ti][1] + (path[ti + 1][1] - path[ti][1]) * partRatio
-    #  print((x,y))
 
     return [x, y, ti]
 
 
 def LineCollisionCheck(first, second, obstacleList):
-    # Line Equation
+    # Uses Line Equation to check for collisions along new line made by connecting nodes
 
     x1 = first[0]
     y1 = first[1]
@@ -214,11 +238,12 @@ def LineCollisionCheck(first, second, obstacleList):
     try:
         a = y2 - y1
         b = x2 - x1
-        # c = y2 * (x2 - x1) - x2 * (y2 - y1)
         c = x2*y1 - y2*x1
     except ZeroDivisionError:
         return False
     dist = abs(a*obstacleList[:,0]-b*obstacleList[:,1]+c)/np.sqrt(a*a+b*b)-obstacleList[:,2]
+    
+    #filter to only look at obstacles within range of endpoints of lines
     prox = np.bitwise_not(np.bitwise_and(
             np.bitwise_or(
                 np.bitwise_and(obstacleList[:,0]<=x2 ,obstacleList[:,0]<=x1),
@@ -236,12 +261,8 @@ def LineCollisionCheck(first, second, obstacleList):
 def PathSmoothing(path, maxIter, obstacleList):
     print "PathSmoothing"
     le = GetPathLength(path)
-    # first = [0,0,0]
-    # pickPoints = [0,le]
-    # while first[2]<len(path):
-        # first = GetTargetPoint(path,PickPoints[0])
-        # second = GetTargetPoint(path,PickPoints[1])
-        # if LineCollisionCheck(first,second,obstacleList)
+    
+    #randomly sample maxIter times to smooth path
     for i in range(maxIter):
         # Sample two points
         pickPoints = [random.uniform(0, le), random.uniform(0, le)]
@@ -272,28 +293,66 @@ def PathSmoothing(path, maxIter, obstacleList):
 
     return path
 
+def GenerateWaypoints(smoothedPath,z,waypoint_thresh):
+    #generates waypoints to fly from smoothed path
+
+    waypoints = []
+    smoothedPath = np.array(smoothedPath)
+    smoothedPath = np.flip(smoothedPath,0)
+    
+    #start by filtering out path points within threshold of previous point
+    dspath = smoothedPath - np.roll(smoothedPath,1,axis=0)
+    dlen = np.sqrt(dspath[:,0]**2+dspath[:,1]**2)
+    dlen = dlen[1:len(dlen)]
+    smoothedPath = np.delete(smoothedPath,np.where(dlen<waypoint_thresh),0)
+    
+    #compute heading angle to fly waypoint (currently assuming flight pointing at next waypoint)
+    dsmoothedPath = smoothedPath -np.roll(smoothedPath,1,0)
+    smoothedPath = smoothedPath[1:len(smoothedPath)]
+    dsmoothedPath = dsmoothedPath[1:len(dsmoothedPath)]
+    angle_path = np.arctan2(dsmoothedPath[:,0],dsmoothedPath[:,1])
+
+    #waypoints are [N,E,D,psi]
+    waypoints = np.array([smoothedPath[:,0],smoothedPath[:,1],z*np.ones(len(dsmoothedPath)),angle_path]).T
+
+    return waypoints
 
 class GenerateMap:
-    def __init__(self, line, file, px_conv, bw_thresh, obstacleSize):
+    def __init__(self, line, file, px_conv, bw_thresh, obstacleSize, theta, x_shift, y_shift):
         self.line = line
-        self.xs = [0,0]
-        self.ys = [0,0]
+
         self.cid = line.figure.canvas.mpl_connect('button_press_event', self)
         self.node = 0
-        self.start = [0,0]
-        self.goal = [0,0]
-        self.xmin = 0
-        self.ymin = 0
-        self.xmax = 0
-        self.ymax = 0
+
+        self.theta = theta
+        self.x_trans = x_shift
+        self.y_trans = y_shift
         self.px_conv = px_conv
         self.bw_thresh = bw_thresh
         self.file = file
         self.ob_size = obstacleSize
         self.generate_obstacles()
+        self.RotObs()
+        self.TransObs()
+        #find min and max on map
+        self.xmin = min(self.obs[:,0])
+        self.xmax = max(self.obs[:,0])
+        self.ymin = min(self.obs[:,1])
+        self.ymax = max(self.obs[:,1])
+
+        print "xmin: ",self.xmin
+        print "xmax: ",self.xmax
+        print "ymin: ",self.ymin
+        print "ymax: ",self.ymax
+    
+        self.xs = [self.xmin,self.ymin]
+        self.ys = [self.xmin,self.ymin]
+        self.start = [self.xmin,self.ymin]
+        self.goal = [self.xmin,self.ymin]
         self.PlotObs()
 
     def __call__(self, event):
+        #Records x and y locations of mouse clicks and sends them to start and goal positions
         if event.inaxes!=self.line.axes: return
 
         if self.node == 0:
@@ -322,12 +381,11 @@ class GenerateMap:
         map_bw = cv2.bitwise_not(map_bw)
 
         #try to clean up noise in the map
-        kernel = np.ones((5,5),np.uint8)
         # map_bw = cv2.dilate(map_bw,kernel,iterations = 3)
         # map_bw = cv2.erode(map_bw,kernel,iterations = 3)
-        map_bw = cv2.morphologyEx(map_bw, cv2.MORPH_CLOSE,kernel)
+        # map_bw = cv2.morphologyEx(map_bw, cv2.MORPH_CLOSE,kernel)
         # map_bw = cv2.morphologyEx(map_bw, cv2.MORPH_OPEN,kernel)
-        map_bw = cv2.morphologyEx(map_bw, cv2.MORPH_CLOSE,kernel)
+        # map_bw = cv2.morphologyEx(map_bw, cv2.MORPH_CLOSE,kernel)
 
         if color_image:
             #Clear out color and flatten image
@@ -359,42 +417,26 @@ class GenerateMap:
         self.obs = obs[:,np.argsort([1,0,2])] #rearange so obstacles are [[x,y,size]]
         self.obs[:,1]=self.obs[:,1]*-1 #invert y to match original image
 
-        #find min and max on map
-        self.xmin = min(self.obs[:,0])
-        self.xmax = max(self.obs[:,0])
-        self.ymin = min(self.obs[:,1])
-        self.ymax = max(self.obs[:,1])
+    def RotObs(self):
+        #rotate obstacles by theta
+        rot_theta = np.array([[np.cos(self.theta),-np.sin(self.theta)],
+                              [np.sin(self.theta), np.cos(self.theta)]])
+        self.obs[:,0:2] = np.matmul(self.obs[:,0:2],rot_theta)
 
-        print "xmin: ",self.xmin
-        print "xmax: ",self.xmax
-        print "ymin: ",self.ymin
-        print "ymax: ",self.ymax
-
-        # ob_list = []
-        # prox_thresh = 0.2*2
-        # # prox_thresh = 0.09*2
-        # for i,x in enumerate(obs.T):
-            # x = x*px_conv
-            # if i == 0:
-                # ob_list.append([x[1],x[0],0.25])
-                # # ob_list.append((x[1],x[0],0.15))
-            # else:
-                # print (np.float(i)/len(obs.T))
-                # min_dist = 1
-                # for i in range(0,len(ob_list)):
-                    # min_dist =min(np.sqrt((x[1]-ob_list[i][0])**2+(x[0]-ob_list[i][1])**2),min_dist)
-                # if min_dist > prox_thresh:
-                    # ob_list.append([x[1],x[0],0.25])
-        # select_start(obs,xmin,xmax,ymin,ymax)
-         # return obs,xmin,xmax,ymin,ymax
+    def TransObs(self):
+        #translate obstacles by x_shift and y_shift
+        self.obs[:,0]+=self.x_trans
+        self.obs[:,1]+=self.y_trans
 
     def PlotObs(self):
-
+        #plot obstacles for visualization
         if show_obs_size:
             self.PlotCircle(self.obs[:,0],self.obs[:,1],self.obs[:,2])
         else:
             plt.plot(self.obs[:,0],self.obs[:,1],".k")
-        plt.axis([self.xmin,self.xmax,self.ymin,self.ymax])
+        plt.xlim(self.xmin,self.xmax)
+        plt.ylim(self.ymin,self.ymax)
+        plt.axis('scaled')
         plt.grid(True)
         plt.pause(0.01)
 
@@ -410,9 +452,10 @@ def main():
     fig = plt.figure()
     ax = fig.add_subplot(111)
     ax.set_title('Select Start and Goal (Close when finished)')
+    
+
     line, = ax.plot([0,0], [0,0],"xr")  # empty line
-    generator = GenerateMap(line, file, px_conv, bw_thresh, obstacleSize)
-    # generator = GenerateMap(line, file = 'lab_map.png',px_conv = 0.03103, bw_thresh = 10)
+    generator = GenerateMap(line, file, px_conv, bw_thresh, obstacleSize,theta,x_shift,y_shift)
     plt.show()
 
     start = generator.start
@@ -423,13 +466,13 @@ def main():
     xmax = generator.xmax
     ymax = generator.ymax
 
-    rrt = RRT(start, goal,
-              randArea=[xmin, xmax, ymin, ymax], obstacleList=obstacleList)
+    rrt = RRT(start, goal, [xmin, xmax, ymin, ymax], 
+              obstacleList, expandDis, goalSampleRate, maxIter)
     path = rrt.Planning(animation=show_animation)
-
+    
     # Path smoothing
-    maxIter = 1000
     smoothedPath = PathSmoothing(path, maxIter, obstacleList)
+    waypoints = GenerateWaypoints(smoothedPath,z,waypoint_thresh)
     # Draw final path
     if plot_final:
         rrt.DrawGraph()
@@ -437,10 +480,11 @@ def main():
 
         plt.plot([x for (x, y) in smoothedPath], [
             y for (x, y) in smoothedPath], '-b')
-
+        plt.plot(waypoints[:,0],waypoints[:,1],'oc')
+        plt.plot([waypoints[:,0],waypoints[:,0]+.5*np.cos(-waypoints[:,3]+np.pi/2)],
+                 [waypoints[:,1],waypoints[:,1]+.5*np.sin(-waypoints[:,3]+np.pi/2)],'-c')
         plt.grid(True)
-        plt.pause(0.001)  # Need for Mac
+        plt.pause(0.001)
         plt.show()
-
 if __name__ == '__main__':
     main()
