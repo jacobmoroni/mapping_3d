@@ -1,7 +1,7 @@
 """
 Path Planning Code with Randomized Rapidly-Exploring Random Trees (RRT)
 
-@author: Jacob Olson 
+@author: Jacob Olson
 based off of code written by AtsushiSakai(@Atsushi_twi)
 
 """
@@ -34,15 +34,15 @@ waypoint_thresh --- Threshold Distance to prune waypoints at the expandDisi
 
 expandDis --------- Distance to expand the RRT tree each iteration
 goalSampleRate ---- Percent chance of "randomly" sampling goal for RRT
-maxIter ----------- Number of times the path smoothing iterates 
+maxIter ----------- Number of times the path smoothing iterates
 
 '''
-show_animation = False 
+show_animation = False
 plot_final = True
 
-# file = "lab_map.png" 
-# obstacleSize = .2 
-# bw_thresh = 10 
+# file = "lab_map.png"
+# obstacleSize = .2
+# bw_thresh = 10
 # px_conv = 0.03103
 # thetadeg = 10
 # x_shift = 0
@@ -52,11 +52,11 @@ plot_final = True
 # goalSampleRate = 20
 # maxIter = 1000
 
-file = "/home/jacob/Pictures/willow_garage_edit.png" 
-obstacleSize = .3 
-bw_thresh = 10 
+file = "/home/jacob/Pictures/willow_garage_edit.png"
+obstacleSize = .3
+bw_thresh = 10
 px_conv = 0.05
-thetadeg = 0 
+thetadeg = 0
 x_shift = 0
 y_shift = 0
 z = -1
@@ -65,9 +65,9 @@ goalSampleRate = 20
 maxIter = 1000
 
 #parameters for full willow map
-# file = "/home/jacob/Pictures/willow_full.png" 
-# obstacleSize = .3 
-# bw_thresh = 10 
+# file = "/home/jacob/Pictures/willow_full.png"
+# obstacleSize = .3
+# bw_thresh = 10
 # px_conv = 0.07306
 # thetadeg = 180
 # x_shift = 22.0
@@ -77,8 +77,8 @@ maxIter = 1000
 # goalSampleRate = 20
 # maxIter = 1000
 
-color_image = True 
-show_obs_size = False 
+color_image = True
+show_obs_size = False
 waypoint_thresh = 0.09
 
 
@@ -89,7 +89,7 @@ theta = thetadeg*np.pi/180
 if color_image:
     bw_thresh = 90
 
-class RRT():
+class RRTSearch():
     """
     Class for RRT Planning
     """
@@ -129,7 +129,7 @@ class RRT():
                 #Replot before starting
                 self.DrawGraph()
                 first_time = False
-        
+
             # Random Sampling
             if random.randint(0, 100) > self.goalSampleRate:
                 rnd = [random.uniform(self.minxrand, self.maxxrand), random.uniform(
@@ -152,10 +152,10 @@ class RRT():
 
             if not self.__CollisionCheck(newNode, self.obstacleList):
                 continue
-                
+
             self.nodeList.append(newNode)
 
-            if LineCollisionCheck(newNode,self.goal,self.obstacleList):
+            if self.LineCollisionCheck(newNode,self.goal,self.obstacleList):
                 print ("line to goal")
                 break
             # check goal
@@ -227,132 +227,173 @@ class RRT():
         else:
             return True #safe
 
-def GetPathLength(path):
-    # return current length of path
-    path = np.array(path)
-    dpath = path - np.roll(path,1,axis=0)
-    dlen = np.sqrt(dpath[:,0]**2+dpath[:,1]**2)
-    le = sum(dlen[1:len(dlen)])
+    def LineCollisionCheck(self,first, second, obstacleList):
+        # Uses Line Equation to check for collisions along new line made by connecting nodes
 
-    return le
+        x1 = first[0]
+        y1 = first[1]
+        x2 = second[0]
+        y2 = second[1]
 
-
-def GetTargetPoint(path, targetL):
-    #return location and position of nearest node to randomly sampled length
-    path = np.array(path)
-    dpath = path - np.roll(path,1,axis=0)
-    dlen = np.sqrt(dpath[:,0]**2+dpath[:,1]**2)
-    dlen = dlen[1:len(dlen)]
-    dsum = np.cumsum(dlen)
-    ti = np.argmax(dsum>=targetL)-1
-    lastPairLen = dlen[ti+1]
-    le = dsum[ti+1]
-
-    partRatio = (le - targetL) / lastPairLen
-
-    x = path[ti][0] + (path[ti + 1][0] - path[ti][0]) * partRatio
-    y = path[ti][1] + (path[ti + 1][1] - path[ti][1]) * partRatio
-
-    return [x, y, ti]
-
-
-def LineCollisionCheck(first, second, obstacleList):
-    # Uses Line Equation to check for collisions along new line made by connecting nodes
-
-    x1 = first[0]
-    y1 = first[1]
-    x2 = second[0]
-    y2 = second[1]
-
-    try:
-        a = y2 - y1
-        b = x2 - x1
-        c = x2*y1 - y2*x1
-    except ZeroDivisionError:
-        return False
-    dist = abs(a*obstacleList[:,0]-b*obstacleList[:,1]+c)/np.sqrt(a*a+b*b)-obstacleList[:,2]
-    
-    #filter to only look at obstacles within range of endpoints of lines
-    prox = np.bitwise_not(np.bitwise_and(
-            np.bitwise_or(
-                np.bitwise_and(obstacleList[:,0]<=x2 ,obstacleList[:,0]<=x1),
-                np.bitwise_and(obstacleList[:,0]>=x2,obstacleList[:,0]>=x1)),
-            np.bitwise_or(
-                np.bitwise_and(obstacleList[:,1]<=y2,obstacleList[:,1]<=y1),
-                np.bitwise_and(obstacleList[:,1]>=y2,obstacleList[:,1]>=y1))))
-
-    if dist[prox].size > 0:
-        if min(dist[prox])<=0:
+        try:
+            a = y2 - y1
+            b = x2 - x1
+            c = x2*y1 - y2*x1
+        except ZeroDivisionError:
             return False
-        else:
-            return True
+        dist = abs(a*obstacleList[:,0]-b*obstacleList[:,1]+c)/np.sqrt(a*a+b*b)-obstacleList[:,2]
 
-def PathSmoothing(path, maxIter, obstacleList):
-    print "PathSmoothing"
-    le = GetPathLength(path)
-    
-    #randomly sample maxIter times to smooth path
-    for i in range(maxIter):
-        # Sample two points
-        pickPoints = [random.uniform(0, le), random.uniform(0, le)]
-        pickPoints.sort()
-        first = GetTargetPoint(path, pickPoints[0])
-        second = GetTargetPoint(path, pickPoints[1])
+        #filter to only look at obstacles within range of endpoints of lines
+        prox = np.bitwise_not(np.bitwise_and(
+                np.bitwise_or(
+                    np.bitwise_and(obstacleList[:,0]<=x2 ,obstacleList[:,0]<=x1),
+                    np.bitwise_and(obstacleList[:,0]>=x2,obstacleList[:,0]>=x1)),
+                np.bitwise_or(
+                    np.bitwise_and(obstacleList[:,1]<=y2,obstacleList[:,1]<=y1),
+                    np.bitwise_and(obstacleList[:,1]>=y2,obstacleList[:,1]>=y1))))
 
-        if first[2] <= 0 or second[2] <= 0:
-            continue
+        if dist[prox].size > 0:
+            if min(dist[prox])<=0:
+                return False
+            else:
+                return True
 
-        if (second[2] + 1) > len(path):
-            continue
+class RRTSmooth:
+    def __init__(self):
+        self.this = 0
 
-        if second[2] == first[2]:
-            continue
+    def GetPathLength(self, path):
+        # return current length of path
+        path = np.array(path)
+        dpath = path - np.roll(path,1,axis=0)
+        dlen = np.sqrt(dpath[:,0]**2+dpath[:,1]**2)
+        le = sum(dlen[1:len(dlen)])
 
-        # collision check
-        if not LineCollisionCheck(first, second, obstacleList):
-            continue
-        # Create New path
-        newPath = []
-        newPath.extend(path[:first[2] + 1])
-        newPath.append([first[0], first[1]])
-        newPath.append([second[0], second[1]])
-        newPath.extend(path[second[2] + 1:])
-        path = newPath
-        le = GetPathLength(path)
+        return le
 
-    return path
 
-def GenerateWaypoints(smoothedPath,z,waypoint_thresh):
-    #generates waypoints to fly from smoothed path
+    def GetTargetPoint(self, path, targetL):
+        #return location and position of nearest node to randomly sampled length
+        path = np.array(path)
+        dpath = path - np.roll(path,1,axis=0)
+        dlen = np.sqrt(dpath[:,0]**2+dpath[:,1]**2)
+        dlen = dlen[1:len(dlen)]
+        dsum = np.cumsum(dlen)
+        ti = np.argmax(dsum>=targetL)-1
+        lastPairLen = dlen[ti+1]
+        le = dsum[ti+1]
 
-    waypoints = []
-    smoothedPath = np.array(smoothedPath)
-    smoothedPath = np.flip(smoothedPath,0)
-    
-    #start by filtering out path points within threshold of previous point
-    dspath = smoothedPath - np.roll(smoothedPath,1,axis=0)
-    dlen = np.sqrt(dspath[:,0]**2+dspath[:,1]**2)
-    dlen = dlen[1:len(dlen)]
-    smoothedPath = np.delete(smoothedPath,np.where(dlen<waypoint_thresh),0)
-    
-    #compute heading angle to fly waypoint (currently assuming flight pointing at next waypoint)
-    dsmoothedPath = smoothedPath -np.roll(smoothedPath,1,0)
-    smoothedPath = smoothedPath[1:len(smoothedPath)]
-    dsmoothedPath = dsmoothedPath[1:len(dsmoothedPath)]
-    angle_path = np.arctan2(dsmoothedPath[:,0],dsmoothedPath[:,1])
+        partRatio = (le - targetL) / lastPairLen
 
-    #waypoints are [N,E,D,psi]
-    waypoints = np.array([smoothedPath[:,1],smoothedPath[:,0],z*np.ones(len(dsmoothedPath)),angle_path]).T
+        x = path[ti][0] + (path[ti + 1][0] - path[ti][0]) * partRatio
+        y = path[ti][1] + (path[ti + 1][1] - path[ti][1]) * partRatio
 
-    return waypoints
+        return [x, y, ti]
+
+
+    def LineCollisionCheck(self,first, second, obstacleList):
+        # Uses Line Equation to check for collisions along new line made by connecting nodes
+
+        x1 = first[0]
+        y1 = first[1]
+        x2 = second[0]
+        y2 = second[1]
+
+        try:
+            a = y2 - y1
+            b = x2 - x1
+            c = x2*y1 - y2*x1
+        except ZeroDivisionError:
+            return False
+        dist = abs(a*obstacleList[:,0]-b*obstacleList[:,1]+c)/np.sqrt(a*a+b*b)-obstacleList[:,2]
+
+        #filter to only look at obstacles within range of endpoints of lines
+        prox = np.bitwise_not(np.bitwise_and(
+                np.bitwise_or(
+                    np.bitwise_and(obstacleList[:,0]<=x2 ,obstacleList[:,0]<=x1),
+                    np.bitwise_and(obstacleList[:,0]>=x2,obstacleList[:,0]>=x1)),
+                np.bitwise_or(
+                    np.bitwise_and(obstacleList[:,1]<=y2,obstacleList[:,1]<=y1),
+                    np.bitwise_and(obstacleList[:,1]>=y2,obstacleList[:,1]>=y1))))
+
+        if dist[prox].size > 0:
+            if min(dist[prox])<=0:
+                return False
+            else:
+                return True
+
+    def PathSmoothing(self, path, maxIter, obstacleList):
+        print "PathSmoothing"
+        le = self.GetPathLength(path)
+
+        #randomly sample maxIter times to smooth path
+        for i in range(maxIter):
+            # Sample two points
+            pickPoints = [random.uniform(0, le), random.uniform(0, le)]
+            pickPoints.sort()
+            first = self.GetTargetPoint(path, pickPoints[0])
+            second = self.GetTargetPoint(path, pickPoints[1])
+
+            if first[2] <= 0 or second[2] <= 0:
+                continue
+
+            if (second[2] + 1) > len(path):
+                continue
+
+            if second[2] == first[2]:
+                continue
+
+            # collision check
+            if not self.LineCollisionCheck(first, second, obstacleList):
+                continue
+            # Create New path
+            newPath = []
+            newPath.extend(path[:first[2] + 1])
+            newPath.append([first[0], first[1]])
+            newPath.append([second[0], second[1]])
+            newPath.extend(path[second[2] + 1:])
+            path = newPath
+            le = self.GetPathLength(path)
+
+        return path
+
+    def GenerateWaypoints(self, smoothedPath,z,waypoint_thresh):
+        #generates waypoints to fly from smoothed path
+
+        waypoints = []
+        smoothedPath = np.array(smoothedPath)
+        smoothedPath = np.flip(smoothedPath,0)
+
+        #start by filtering out path points within threshold of previous point
+        dspath = smoothedPath - np.roll(smoothedPath,1,axis=0)
+        dlen = np.sqrt(dspath[:,0]**2+dspath[:,1]**2)
+        dlen = dlen[1:len(dlen)]
+        smoothedPath = np.delete(smoothedPath,np.where(dlen<waypoint_thresh),0)
+
+        #compute heading angle to fly waypoint (currently assuming flight pointing at next waypoint)
+        dsmoothedPath = smoothedPath -np.roll(smoothedPath,1,0)
+        smoothedPath = smoothedPath[1:len(smoothedPath)]
+        dsmoothedPath = dsmoothedPath[1:len(dsmoothedPath)]
+        angle_path = np.arctan2(dsmoothedPath[:,0],dsmoothedPath[:,1])
+        
+        #current waypoint follower goes to psi delayed be 1 waypoint so shift psi back by 1 
+        angle_path = np.roll(angle_path,-1,0)
+        angle_path[-1] = angle_path[-2]
+
+
+        #waypoints are [N,E,D,psi]
+        waypoints = np.array([smoothedPath[:,1],smoothedPath[:,0],z*np.ones(len(dsmoothedPath)),angle_path]).T
+
+        return waypoints
 
 class GenerateMap:
-    def __init__(self, line, file, px_conv, bw_thresh, obstacleSize, theta, x_shift, y_shift):
-        self.line = line
+    def __init__(self, points, file, px_conv, bw_thresh, obstacleSize,
+                theta, x_shift, y_shift, pre_gen_obs, robotx_g, roboty_g):
+        # Pass in None as file to use obstacles generated from ROS
 
-        self.cid = line.figure.canvas.mpl_connect('button_press_event', self)
+        self.points = points
+        self.cid = points.figure.canvas.mpl_connect('button_press_event', self)
         self.node = 0
-
         self.theta = theta
         self.x_trans = x_shift
         self.y_trans = y_shift
@@ -360,7 +401,17 @@ class GenerateMap:
         self.bw_thresh = bw_thresh
         self.file = file
         self.ob_size = obstacleSize
-        self.generate_obstacles()
+
+        if self.file == None:
+            self.ROSObstacles = True
+            self.obs = pre_gen_obs
+            self.robotx = robotx_g
+            self.roboty = roboty_g
+            self.GenerateObstaclesFromROS()
+        else:
+            self.ROSObstacles = False
+            self.GenerateObstaclesFromImg()
+
         self.RotObs()
         self.TransObs()
         #find min and max on map
@@ -373,7 +424,7 @@ class GenerateMap:
         print "xmax: ",self.xmax
         print "ymin: ",self.ymin
         print "ymax: ",self.ymax
-    
+
         self.xs = [self.xmin,self.ymin]
         self.ys = [self.xmin,self.ymin]
         self.start = [self.xmin,self.ymin]
@@ -382,25 +433,40 @@ class GenerateMap:
 
     def __call__(self, event):
         #Records x and y locations of mouse clicks and sends them to start and goal positions
-        if event.inaxes!=self.line.axes: return
+        if event.inaxes!=self.points.axes: return
 
-        if self.node == 0:
-            self.xs[0] = event.xdata
-            self.ys[0] = event.ydata
-            self.start=[event.xdata,event.ydata]
-            print "starting point selected: x= ",event.xdata," y= ", event.ydata
-            self.node = 1
-        else:
+        if self.ROSObstacles:
+            self.xs[0] = self.robotx
+            self.ys[0] = self.roboty
             self.xs[1] = event.xdata
             self.ys[1] = event.ydata
+            self.start = [self.robotx,self.roboty]
             self.goal = [event.xdata,event.ydata]
             print "goal selected: x= ",event.xdata," y= ", event.ydata
-            self.node = 0
-        self.line.set_data(self.xs, self.ys)
-        self.line.figure.canvas.draw()
-        return self.start,self.goal
 
-    def generate_obstacles(self):
+        else:
+            if self.node == 0:
+                self.xs[0] = event.xdata
+                self.ys[0] = event.ydata
+                self.start=[event.xdata,event.ydata]
+                print "starting point selected: x= ",event.xdata," y= ", event.ydata
+                self.node = 1
+            else:
+                self.xs[1] = event.xdata
+                self.ys[1] = event.ydata
+                self.goal = [event.xdata,event.ydata]
+                print "goal selected: x= ",event.xdata," y= ", event.ydata
+                self.node = 0
+
+        self.points.set_data(self.xs, self.ys)
+        self.points.figure.canvas.draw()
+        return self.start,self.goal
+        
+    def GenerateObstaclesFromROS(self):
+        sizes = np.ones([1,len(self.obs)])*self.ob_size
+        self.obs = np.append(self.obs.T,sizes,axis=0).T
+
+    def GenerateObstaclesFromImg(self):
         if color_image:
             map_raw = cv2.imread(self.file,1)
         else:
@@ -481,10 +547,13 @@ def main():
     fig = plt.figure()
     ax = fig.add_subplot(111)
     ax.set_title('Select Start and Goal (Close when finished)')
-    
+    pre_gen_obs = None
+    robotx = None
+    roboty = None
 
-    line, = ax.plot([0,0], [0,0],"xr")  # empty line
-    generator = GenerateMap(line, file, px_conv, bw_thresh, obstacleSize,theta,x_shift,y_shift)
+    points, = ax.plot([0,0], [0,0],"xr")  # empty points
+    generator = GenerateMap(points, file, px_conv, bw_thresh, obstacleSize,
+            theta,x_shift,y_shift,pre_gen_obs,robotx,roboty)
     plt.show()
 
     start = generator.start
@@ -495,13 +564,15 @@ def main():
     xmax = generator.xmax
     ymax = generator.ymax
 
-    rrt = RRT(start, goal, [xmin, xmax, ymin, ymax], 
+    smooth = RRTSmooth()
+    rrt = RRTSearch(start, goal, [xmin, xmax, ymin, ymax],
               obstacleList, expandDis, goalSampleRate, maxIter)
     path = rrt.Planning(animation=show_animation)
-    
+
     # Path smoothing
-    smoothedPath = PathSmoothing(path, maxIter, obstacleList)
-    waypoints = GenerateWaypoints(smoothedPath,z,waypoint_thresh)
+
+    smoothedPath = smooth.PathSmoothing(path, maxIter, obstacleList)
+    waypoints = smooth.GenerateWaypoints(smoothedPath,z,waypoint_thresh)
     print waypoints.tolist()
     # Draw final path
     if plot_final:
@@ -516,6 +587,6 @@ def main():
         plt.grid(True)
         plt.pause(0.001)
         plt.show()
-        set_trace()
+        # set_trace()
 if __name__ == '__main__':
     main()

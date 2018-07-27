@@ -41,7 +41,7 @@
   <arg name="database_path"           default="~/.ros/rtabmap.db"/>
   <arg name="queue_size"              default="10"/>
   <arg name="wait_for_transform"      default="0.2"/>
-  <arg name="args"                    default="--delete_db_on_start"/>      <!-- delete_db_on_start, udebug -->
+  <arg name="args"                    default=""/>      <!-- delete_db_on_start, udebug -->
   <arg name="rtabmap_args"            default="$(arg args)"/>   <!-- deprecated, use "args" argument -->
   <arg name="launch_prefix"           default=""/>              <!-- for debugging purpose, it fills launch-prefix tag of the nodes -->
   <arg name="output"                  default="screen"/>        <!-- Control node output (screen or log) -->
@@ -51,13 +51,19 @@
   <arg unless="$(arg stereo)" name="approx_sync"  default="true"/>
 
   <!-- RGB-D related topics -->
-  <arg name="rgb_topic"               default="/camera/color/image_rect_color" />
+  <arg name="rgb_topic"               default="/slammer/camera/rgb/image_raw" />
+  <arg name="depth_topic"             default="/slammer/camera/depth/image_raw" /> 
+  <arg name="camera_info_topic"       default="/slammer/camera/rgb/camera_info" />
+  <arg name="depth_camera_info_topic" default="/slammer/camera/depth/camera_info" />
+
+
+  <!--<arg name="rgb_topic"               default="/camera/color/image_rect_color" />-->
   <!-- <arg name="depth_topic"             default="/camera/depth_registered/image" /> -->
-  <arg name="camera_info_topic"       default="/camera/color/camera_info" />
-  <arg name="depth_camera_info_topic" default="/camera/depth/camera_info" />
+  <!--<arg name="camera_info_topic"       default="/camera/color/camera_info" />-->
+  <!--<arg name="depth_camera_info_topic" default="/camera/depth/camera_info" />-->
 
   <!-- <arg name="rgb_topic"               default="/camera/color/image_rect_color" /> -->
-  <arg name="depth_topic"             default="/camera/aligned_depth_to_color/image_raw" />
+  <!--<arg name="depth_topic"             default="/camera/aligned_depth_to_color/image_raw" />-->
   <!-- <arg name="depth_topic"             default="/camera/depth/image_rect_raw" /> -->
   <!-- <arg name="depth_topic"             default="/camera/depth/color/points" /> -->
   <!-- <arg name="camera_info_topic"       default="/camera/color/camera_info" /> -->
@@ -81,8 +87,8 @@
   <arg name="rgb_image_transport"     default="compressed"/>    <!-- Common types: compressed, theora (see "rosrun image_transport list_transports") -->
   <arg name="depth_image_transport"   default="compressedDepth"/>  <!-- Common types: compressed, theora (see "rosrun image_transport list_transports") -->
 
-  <arg name="subscribe_scan"          default="false"/>
-  <arg name="scan_topic"              default="/leo/scan"/>
+  <arg name="subscribe_scan"          default="true"/>
+  <arg name="scan_topic"              default="/slammer/slammer/scan"/>
   <arg name="subscribe_scan_cloud"    default="false"/>
   <arg name="scan_cloud_topic"        default="/leo/mergedPointcloud"/>
   <arg name="scan_normal_k"           default="0"/>
@@ -116,12 +122,12 @@
 
   <!-- Nodes -->
   <!-- Kinect cloud to laser scan -->
-  <node pkg="depthimage_to_laserscan" type="depthimage_to_laserscan" name="depthimage_to_laserscan">
-    <remap from="image"     to="/leo/camera/aligned_depth_to_color/image_raw"/>
-    <remap from="camera_info" to="/leo/camera/depth/camera_info"/>
-    <remap from="scan" to="/realsense_scan"/>
-    <param name="range_max" type="double" value="4"/>
-  </node>
+  <!--<node pkg="depthimage_to_laserscan" type="depthimage_to_laserscan" name="depthimage_to_laserscan">-->
+    <!--<remap from="image"     to="/leo/camera/aligned_depth_to_color/image_raw"/>-->
+    <!--<remap from="camera_info" to="/leo/camera/depth/camera_info"/>-->
+    <!--<remap from="scan" to="/realsense_scan"/>-->
+    <!--<param name="range_max" type="double" value="4"/>-->
+  <!--</node>-->
 
   <group ns="$(arg namespace)">
 
@@ -181,6 +187,9 @@
           <param name="guess_frame_id"              type="string" value="$(arg odom_guess_frame_id)"/>
           <param name="guess_min_translation"       type="double" value="$(arg odom_guess_min_translation)"/>
           <param name="guess_min_rotation"          type="double" value="$(arg odom_guess_min_rotation)"/>
+          <!-- added parameters -->
+          <param name="publish_null_when_lost"      type="bool"   value="false"/>
+          <param name="Odom/ResetCountdown"         type="double" value="1"/>
         </node>
 
         <!-- Stereo Odometry -->
@@ -252,7 +261,11 @@
       <param name="config_path"          type="string" value="$(arg cfg)"/>
       <param name="queue_size"           type="int" value="$(arg queue_size)"/>
       <param name="scan_normal_k"        type="int" value="$(arg scan_normal_k)"/>
-      <param name="Grid/FromDepth" type="string" value="true"/>
+      <!-- Added Parameters -->
+      <!-- This builds grid with depth and allows octomap to be built -->
+      <param name="Grid/FromDepth" type="string" value="false"/>
+      <!-- This selects the optimizer 0 = toro other options are g2o and gtsam -->
+      <!--<param name="Optimizer/Strategy" type="int" value="0"/> -->
 
       <remap from="rgb/image"       to="$(arg rgb_topic_relay)"/>
       <remap from="depth/image"     to="$(arg depth_topic_relay)"/>

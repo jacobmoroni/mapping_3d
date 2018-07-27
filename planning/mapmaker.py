@@ -1,8 +1,8 @@
 import numpy as np
 import cv2
 from ipdb import set_trace
-map_raw = cv2.imread('lab_map.png',1)
-# map_raw = cv2.imread('maze1.jpg',0)
+# map_raw = cv2.imread('lab_map.png',1)
+map_raw = cv2.imread('/home/jacob/Pictures/willow_garage_edit.png',0)
 cv2.imshow('raw',map_raw)
 
 

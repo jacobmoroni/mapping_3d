@@ -1,10 +1,12 @@
 <launch>
 
   <arg name="mav_name"       default="slammer"/>
-  <arg name="world_file"     default="willowgarage_detail2.world"/>
+  <!--<arg name="world_file"     default="willowgarage.world"/>-->
+  <!--<arg name="world_file"     default="willowgarage_detail3.world"/>-->
   <!--<arg name="world_file"     default="detail_world.world"/>-->
-  <arg name="x"              default="7.0"/>
-  <arg name="y"              default="-7.0"/>
+  <arg name="world_file"     default="custom_world.world"/>
+  <arg name="x"              default="0.0"/>
+  <arg name="y"              default="0.0"/>
   <arg name="z"              default="0.08"/>
   <arg name="yaw"            default="0.0"/> 
   <arg name="debug"          default="false"/>
