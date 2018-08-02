@@ -7,7 +7,7 @@ import rospy, tf
 from nav_msgs.msg import Odometry
 from rosflight_msgs.msg import Command
 from roscopter_msgs.srv import AddWaypoint, RemoveWaypoint, SetWaypointsFromFile
-from std_msgs.msg import Int16
+from std_msgs.msg import Int16,Float32
 
 class WaypointManager():
 
@@ -28,18 +28,29 @@ class WaypointManager():
 
         # set up Services
         self.add_waypoint_service = rospy.Service('add_waypoint', AddWaypoint, self.addWaypointCallback)
-        self.remove_waypoint_service = rospy.Service('remove_waypoint', RemoveWaypoint, self.removeWaypointCallback)
-        self.set_waypoint_from_file_service = rospy.Service('set_waypoints_from_file', SetWaypointsFromFile, self.addWaypointCallback)
+        self.remove_waypoint_service = rospy.Service('remove_waypoint', RemoveWaypoint,
+                self.removeWaypointCallback)
+        self.set_waypoint_from_file_service = rospy.Service('set_waypoints_from_file', SetWaypointsFromFile,
+                self.addWaypointCallback)
 
         # Set Up Publishers and Subscribers
         self.xhat_sub_ = rospy.Subscriber('state', Odometry, self.odometryCallback, queue_size=5)
+        self.obstacle_sub_ = rospy.Subscriber('nearest_obstacle',Float32, self.obstacleCallback, queue_size=5)
         self.waypoint_pub_ = rospy.Publisher('high_level_command', Command, queue_size=5, latch=True)
         self.end_waypoint_pub_ = rospy.Publisher('last_waypoint', Int16 , queue_size = 5, latch = True)
 
+        # Initialize other variables
         self.current_waypoint_index = 0
-        self.reset_waypoints = False
-        self.current_yaw = 0.0
-        
+        self.reset_waypoints = False        #This flag turns true when waypoints are being cleared out
+                                            #   to trigger generating a new waypoint
+        self.current_yaw = 0.0              #when making a new waypoint, after clearing old waypoints,
+                                            #   use same yaw
+        self.planning_flag = 1              #this flag is published and used by path planner to decide
+                                            #   how to plan next path. 1 = visual planning,
+                                            #   2 = no visualization
+        self.obstacle_angle = 0             #angle of current nearest obstacle detected
+        self.obstacle_offset = 0.4          #how far to move away from obstacle after it trips threshold
+
         self.new_waypoint = rospy.ServiceProxy('/slammer/add_waypoint', AddWaypoint)
         command_msg = Command()
         current_waypoint = np.array(self.waypoint_list[0])
@@ -60,13 +71,13 @@ class WaypointManager():
             # wait for new messages and call the callback when they arrive
             rospy.spin()
 
-
     def addWaypointCallback(self,req):
         print("addwaypoints")
-        print req
         new_waypoint = [req.x,req.y,req.z,req.yaw]
+        self.threshold = req.radius
+        self.diff_factor = req.difficulty
         self.waypoint_list.append(new_waypoint)
-        length = 4
+        length = len(self.waypoint_list)
         return length
 
     def removeWaypointCallback(self,req):
@@ -74,54 +85,64 @@ class WaypointManager():
         self.waypoint_list = self.waypoint_list[0:self.current_waypoint_index]
         self.current_waypoint_index -= 1
         self.reset_waypoints = True
-        length = 1
+        if req.front == True:
+            self.planning_flag = 2 #Dont visualize replan
+        length = len(self.waypoint_list)
         return length
 
     def setWaypointsFromFile(req):
         print("set Waypoints from File")
+        #not set up yet
+
+    def obstacleCallback(self,msg):
+        self.obstacle_angle = -msg.data #current angle (converts to NED)
 
     def odometryCallback(self, msg):
         # Get error between waypoint and current state
         current_waypoint = np.array(self.waypoint_list[self.current_waypoint_index])
-        (r, p, y) = tf.transformations.euler_from_quaternion([msg.pose.pose.orientation.x, msg.pose.pose.orientation.y, msg.pose.pose.orientation.z, msg.pose.pose.orientation.w])
+        (r, p, y) = tf.transformations.euler_from_quaternion([msg.pose.pose.orientation.x,
+            msg.pose.pose.orientation.y, msg.pose.pose.orientation.z, msg.pose.pose.orientation.w])
         current_position = np.array([msg.pose.pose.position.x,
                                      msg.pose.pose.position.y,
                                      msg.pose.pose.position.z])
 
         error = np.linalg.norm(current_position - current_waypoint[0:3])
-        
+
+        #If reset_waypoints is triggered, make a new waypoint to stay at until new path is planned
         if self.reset_waypoints:
             command_msg = Command()
-            command_msg.x = current_position[0]
-            command_msg.y = current_position[1]
+            command_msg.x = current_position[0]-self.obstacle_offset*np.cos(self.obstacle_angle)
+            command_msg.y = current_position[1]-self.obstacle_offset*np.sin(self.obstacle_angle)
             command_msg.F = current_position[2]
-            command_msg.z = self.current_yaw 
+            command_msg.z = self.current_yaw
             command_msg.mode = Command.MODE_XPOS_YPOS_YAW_ALTITUDE
             self.waypoint_pub_.publish(command_msg)
-            
             rospy.wait_for_service('/slammer/add_waypoint')
             try:
                 success = self.new_waypoint(x=current_position[0],y=current_position[1],
-                                                z=current_position[2],yaw=self.current_yaw)
+                                                z=current_position[2],yaw=self.current_yaw,
+                                                radius = 0.1, difficulty = 1.0)
                 if success:
                     print "waypoint added"
                     self.current_waypoint_index +=1
             except rospy.ServiceException,e:
                 print "service call add_waypoint failed: %s" %e
             self.reset_waypoints = False
-            
+
         if error < self.threshold:
             # Get new waypoint index
             self.current_waypoint_index += 1
             if self.cyclical_path:
                 self.current_waypoint_index %= len(self.waypoint_list)
             else:
+                # When at the last waypoint, publish the replan flag once
                 if self.current_waypoint_index >= len(self.waypoint_list):
                     self.current_waypoint_index -=1
                     if not self.last_wp_published:
                         flag = Int16()
-                        flag.data = 1
+                        flag.data = self.planning_flag
                         self.end_waypoint_pub_.publish(flag)
+                        self.planning_flag = 1
                     self.last_wp_published = True
                 else:
                     self.last_wp_published = False

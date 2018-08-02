@@ -4,7 +4,7 @@
   <!--<arg name="world_file"     default="willowgarage.world"/>-->
   <!--<arg name="world_file"     default="willowgarage_detail3.world"/>-->
   <!--<arg name="world_file"     default="detail_world.world"/>-->
-  <arg name="world_file"     default="custom_world.world"/>
+  <arg name="world_file"     default="custom_world2.world"/>
   <arg name="x"              default="0.0"/>
   <arg name="y"              default="0.0"/>
   <arg name="z"              default="0.08"/>
@@ -59,6 +59,9 @@
       <remap from="state" to="ground_truth/odometry/NED"/>
       <!-- <remap from="state" to="estimate"/> -->
     </node>
+
+    <!-- Path planner -->
+    <!--<node name="path_planner" pkg="mapping_3d" type="path_planner.py" output="screen"/>-->
 
     <!--[> plot states <]-->
     <!--<node pkg="ekf_slam" type="states_plotter.py" name="states_plotter" output="screen">-->

@@ -265,7 +265,12 @@
       <!-- This builds grid with depth and allows octomap to be built -->
       <param name="Grid/FromDepth" type="string" value="false"/>
       <!-- This selects the optimizer 0 = toro other options are g2o and gtsam -->
-      <!--<param name="Optimizer/Strategy" type="int" value="0"/> -->
+      <param name="Optimizer/Strategy" type="int" value="0"/> 
+      <!--These parameters set detector type 1=sift/surf-->
+      <param name="Kp/DetectorStrategy" type="string" value="0"/>
+      <param name="Vis/FeatureType"     type="double" value="0"/>
+      <param name="RGBD/OptimizeMaxError" type="double" value="2.0"/>
+
 
       <remap from="rgb/image"       to="$(arg rgb_topic_relay)"/>
       <remap from="depth/image"     to="$(arg depth_topic_relay)"/>

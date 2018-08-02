@@ -44,14 +44,35 @@ waypoint_manager: {
 waypoints:
   
   #custom world waypoints
-  [[0.0 , 0.0 , -0.5 , 0.0],
-   [20.5 , 0.0 , -0.5 , -1.5708],
-   [20.5 , -6.5, -0.5 , -3.14159],
-   [5.0  , -6.5, -0.5 , 1.5708],
-   [5.0  , 0.0,  -0.5 , 0.0],
-   [20.5 , 0.0 , -0.5 , -1.5708]],
+  [[0.0 , 0.0 , -1.3 , 0.0],
+  [2.0, 0.0, -1.3, 0.0]],
+   #[15 , 0.0 , -1.3 , -1.5708],
+   #[15 , -6.0, -1.3 , -3.14159],
+   #[9.0  , -6.0, -1.3 , 1.5708],
+   #[9.0  , 0.0,  -1.3 , -3.14159],
+   #[3.0 , 0.0 , -1.3 , -1.5708],
+   #[3.0  ,-6.0,  -1.3 , 0.0],
+   #[9.0  , -6.0,  -1.3 , 1.5708],
+   #[9.0  , 0.0,  -1.3 , 0.0],
+   #[15.0  , 0.0,  -1.3 , -1.5708],
+   #[15.0  , -6.0,  -1.3 , -3.14158],
+   #[3.0  , -6.0,  -1.3 , -1.5708],
+   #[3.0 , -11.0, -1.3, 0]],  
 
-   ##Willow Garage Waypoints
+  #[[0.0 , 0.0 , -1.3 , 0.0],
+   #[15 , 0.0 , -1.3 , 0],
+   #[15 , -6.0, -1.3 , 0],
+   #[9.0  , -6.0, -1.3 ,0],
+   #[9.0  , 0.0,  -1.3 , 0],
+   #[3.0 , 0.0 , -1.3 , 0],
+   #[3.0  ,-6.0,  -1.3 , 0.0],
+   #[9.0  , -6.0,  -1.3 ,0],
+   #[9.0  , 0.0,  -1.3 , 0.0],
+   #[15.0  , 0.0,  -1.3 , 0],
+   #[15.0  , -6.0,  -1.3 , 0],
+   #[3.0  , -6.0,  -1.3 , 0]],
+
+  ##Willow Garage Waypoints
   #[[0, 0, -1, 0],
   #[0.0, 5.0, -1, 0],
   #[2.0, 5.0, -1, 0],
@@ -110,9 +131,33 @@ waypoints:
  # [2.7, -2.7, -5, 0.78]],
 
 threshold: .2,
+diff_factor: .2,
 yaw_threshold: 0.05,
 cycle: False
 
+}
+
+### Path Planning Parameters
+
+planner: {
+
+unknown_as_obs: False,      # Sets all unknown grey area in RTAB-Map occupancy grid to obstacles
+show_obs_size: False,       # Show Obstacles with radius as circles or without as constant size dots
+show_animation: False,      # show the rrt growing
+show_visualization: True,   # show the final path and select with mouse
+file: 0,                 # file containing the map to be loaded in
+bw_thresh: 10,              # black/white threshold used for extracting obstacles
+obstacleSize: 0.8,           # radius of obstacles in map
+#thetadeg ---------- how many degrees to rotate the obstacle map (for adjusting to global map)
+#x_shift ----------- how much to shift the map in the x direction
+#y_shift ----------- how much to shift the map in the y direction
+waypoint_z: -1.3,           # Z value for waypoints generated
+
+waypoint_thresh: 0.1,       # Threshold Distance to prune waypoints at the expandDisi
+
+expandDis: .7,             # Distance to expand the RRT tree each iteration
+goalSampleRate: 20,         # Percent chance of "randomly" sampling goal for RRT
+maxIter: 700                # Number of times the path smoothing iterates
 }
 
 ### Controller Parameters

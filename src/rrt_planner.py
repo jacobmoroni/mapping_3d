@@ -1,5 +1,5 @@
 """
-Path Planning Code with Randomized Rapidly-Exploring Random Trees (RRT)
+Path Planning Classes with Randomized Rapidly-Exploring Random Trees (RRT)
 
 @author: Jacob Olson
 based off of code written by AtsushiSakai(@Atsushi_twi)
@@ -19,7 +19,7 @@ import cv2
 Tunable parameters that get passed in to the functions
 
 show_animation ---- show the rrt growing
-plot_final -------- show the final path
+show_visualization- show the final path and select with mouse
 file -------------- file containing the map to be loaded in
 bw_thresh --------- black/white threshold used for extracting obstacles
 obstacleSize ------ radius of obstacles in map
@@ -28,7 +28,7 @@ thetadeg ---------- how many degrees to rotate the obstacle map (for adjusting t
 x_shift ----------- how much to shift the map in the x direction
 y_shift ----------- how much to shift the map in the y direction
 z ----------------- Z value for waypoints generated
-color_image ------- Sets all unknown grey area in RTAB-Map occupancy grid to obstacles
+unknown_as_obs ---- Sets all unknown grey area in RTAB-Map occupancy grid to obstacles
 show_obs_size ----- Show Obstacles with radius as circles or without as constant size dots
 waypoint_thresh --- Threshold Distance to prune waypoints at the expandDisi
 
@@ -37,97 +37,50 @@ goalSampleRate ---- Percent chance of "randomly" sampling goal for RRT
 maxIter ----------- Number of times the path smoothing iterates
 
 '''
-show_animation = False
-plot_final = True
 
-# file = "lab_map.png"
-# obstacleSize = .2
-# bw_thresh = 10
-# px_conv = 0.03103
-# thetadeg = 10
-# x_shift = 0
-# y_shift = 0
-# z = -1
-# expandDis = 0.2
-# goalSampleRate = 20
-# maxIter = 1000
-
-file = "/home/jacob/Pictures/willow_garage_edit.png"
-obstacleSize = .3
-bw_thresh = 10
-px_conv = 0.05
-thetadeg = 0
-x_shift = 0
-y_shift = 0
-z = -1
-expandDis = 0.35
-goalSampleRate = 20
-maxIter = 1000
-
-#parameters for full willow map
-# file = "/home/jacob/Pictures/willow_full.png"
-# obstacleSize = .3
-# bw_thresh = 10
-# px_conv = 0.07306
-# thetadeg = 180
-# x_shift = 22.0
-# y_shift = -20.1
-# z = -1.3
-# expandDis = 0.35
-# goalSampleRate = 20
-# maxIter = 1000
-
-color_image = True
-show_obs_size = False
-waypoint_thresh = 0.09
-
-
-#convert theta to radians
-theta = thetadeg*np.pi/180
-
-#change threshold to include unknown areas in map into obstacles
-if color_image:
-    bw_thresh = 90
-
-class RRTSearch():
+class RRTSearch:
     """
     Class for RRT Planning
     """
 
-    def __init__(self, start, goal, randArea, obstacleList, expandDis, goalSampleRate, maxIter):
+    def __init__(self, start, goal, searchArea, obstacleList, show_obs_size,
+            expandDis, goalSampleRate, maxIter):
         """
         Setting Parameter
 
         start:Start Position [x,y]
         goal:Goal Position [x,y]
         obstacleList:obstacle Positions [[x,y,size],...]
-        randArea:Ramdom Samping Area [min,max]
+        searchArea:Ramdom Samping Area [min,max]
 
         """
         self.start = [start[0],start[1],None]
         self.goal = [goal[0],goal[1],None]
-        self.minxrand = randArea[0]
-        self.maxxrand = randArea[1]
-        self.minyrand = randArea[2]
-        self.maxyrand = randArea[3]
+        self.minxrand = searchArea[0]
+        self.maxxrand = searchArea[1]
+        self.minyrand = searchArea[2]
+        self.maxyrand = searchArea[3]
         self.expandDis = expandDis
         self.goalSampleRate = goalSampleRate
         self.maxIter = maxIter
         self.obstacleList = obstacleList
+        self.show_obs_size = show_obs_size
 
-    def Planning(self, animation=False):
+    def Planning(self, show_visualization, animation=False):
         """
         Pathplanning
 
+        vizualization: flag for visualization on or off
         animation: flag for animation on or off
         """
         print "Finding Path"
         first_time = True
         self.nodeList = [self.start]
         while True:
-            if first_time == True:
-                #Replot before starting
-                self.DrawGraph()
+            if first_time:
+                if show_visualization:
+                    #Replot before starting
+                    self.DrawGraph()
                 first_time = False
 
             # Random Sampling
@@ -189,7 +142,7 @@ class RRTSearch():
             if node[2] is not None:
                 plt.plot([node[0], self.nodeList[node[2]][0]], [
                          node[1], self.nodeList[node[2]][1]], "-g")
-        if show_obs_size:
+        if self.show_obs_size:
             self.PlotCircle(self.obstacleList[:,0],self.obstacleList[:,1],self.obstacleList[:,2])
 
         else:
@@ -259,6 +212,9 @@ class RRTSearch():
                 return True
 
 class RRTSmooth:
+    """
+    Class for RRT path smoothing
+    """
     def __init__(self):
         self.this = 0
 
@@ -375,8 +331,8 @@ class RRTSmooth:
         smoothedPath = smoothedPath[1:len(smoothedPath)]
         dsmoothedPath = dsmoothedPath[1:len(dsmoothedPath)]
         angle_path = np.arctan2(dsmoothedPath[:,0],dsmoothedPath[:,1])
-        
-        #current waypoint follower goes to psi delayed be 1 waypoint so shift psi back by 1 
+
+        #current waypoint follower goes to psi delayed be 1 waypoint so shift psi back by 1
         angle_path = np.roll(angle_path,-1,0)
         angle_path[-1] = angle_path[-2]
 
@@ -387,12 +343,14 @@ class RRTSmooth:
         return waypoints
 
 class GenerateMap:
-    def __init__(self, points, file, px_conv, bw_thresh, obstacleSize,
-                theta, x_shift, y_shift, pre_gen_obs, robotx_g, roboty_g):
+    def __init__(self, points, file, px_conv, bw_thresh, obstacleSize, unknown_as_obs, show_obs_size,
+                show_visualization, theta, x_shift, y_shift, pre_gen_obs, robotx_g, roboty_g):
         # Pass in None as file to use obstacles generated from ROS
 
         self.points = points
-        self.cid = points.figure.canvas.mpl_connect('button_press_event', self)
+        self.show_visualization = show_visualization
+        if self.show_visualization:
+            self.cid = points.figure.canvas.mpl_connect('button_press_event', self)
         self.node = 0
         self.theta = theta
         self.x_trans = x_shift
@@ -401,8 +359,10 @@ class GenerateMap:
         self.bw_thresh = bw_thresh
         self.file = file
         self.ob_size = obstacleSize
+        self.show_obs_size = show_obs_size
 
-        if self.file == None:
+
+        if self.file == 0:
             self.ROSObstacles = True
             self.obs = pre_gen_obs
             self.robotx = robotx_g
@@ -425,11 +385,12 @@ class GenerateMap:
         print "ymin: ",self.ymin
         print "ymax: ",self.ymax
 
-        self.xs = [self.xmin,self.ymin]
-        self.ys = [self.xmin,self.ymin]
-        self.start = [self.xmin,self.ymin]
-        self.goal = [self.xmin,self.ymin]
-        self.PlotObs()
+        if self.show_visualization:
+            self.xs = [self.xmin,self.ymin]
+            self.ys = [self.xmin,self.ymin]
+            self.start = [self.xmin,self.ymin]
+            self.goal = [self.xmin,self.ymin]
+            self.PlotObs()
 
     def __call__(self, event):
         #Records x and y locations of mouse clicks and sends them to start and goal positions
@@ -461,13 +422,13 @@ class GenerateMap:
         self.points.set_data(self.xs, self.ys)
         self.points.figure.canvas.draw()
         return self.start,self.goal
-        
+
     def GenerateObstaclesFromROS(self):
         sizes = np.ones([1,len(self.obs)])*self.ob_size
         self.obs = np.append(self.obs.T,sizes,axis=0).T
 
     def GenerateObstaclesFromImg(self):
-        if color_image:
+        if unknown_as_obs:
             map_raw = cv2.imread(self.file,1)
         else:
             map_raw = cv2.imread(self.file,0)
@@ -482,7 +443,7 @@ class GenerateMap:
         # map_bw = cv2.morphologyEx(map_bw, cv2.MORPH_OPEN,kernel)
         # map_bw = cv2.morphologyEx(map_bw, cv2.MORPH_CLOSE,kernel)
 
-        if color_image:
+        if unknown_as_obs:
             #Clear out color and flatten image
             map_bw[np.where((map_bw == [255,0,255]).all(axis = 2))] = [0,0,0]
             map_bw[np.where((map_bw == [0,255,255]).all(axis = 2))] = [0,0,0]
@@ -525,7 +486,7 @@ class GenerateMap:
 
     def PlotObs(self):
         #plot obstacles for visualization
-        if show_obs_size:
+        if self.show_obs_size:
             self.PlotCircle(self.obs[:,0],self.obs[:,1],self.obs[:,2])
         else:
             plt.plot(self.obs[:,0],self.obs[:,1],".k")
@@ -542,18 +503,16 @@ class GenerateMap:
         yl = [y + size * math.sin(math.radians(d)) for d in deg]
         plt.plot(xl, yl, "-k")
 
+
 def main():
 
     fig = plt.figure()
     ax = fig.add_subplot(111)
     ax.set_title('Select Start and Goal (Close when finished)')
-    pre_gen_obs = None
-    robotx = None
-    roboty = None
 
-    points, = ax.plot([0,0], [0,0],"xr")  # empty points
-    generator = GenerateMap(points, file, px_conv, bw_thresh, obstacleSize,
-            theta,x_shift,y_shift,pre_gen_obs,robotx,roboty)
+
+    line, = ax.plot([0,0], [0,0],"xr")  # empty line
+    generator = GenerateMap(line, file, px_conv, bw_thresh, obstacleSize,theta,x_shift,y_shift)
     plt.show()
 
     start = generator.start
@@ -564,15 +523,13 @@ def main():
     xmax = generator.xmax
     ymax = generator.ymax
 
-    smooth = RRTSmooth()
-    rrt = RRTSearch(start, goal, [xmin, xmax, ymin, ymax],
+    rrt = RRT(start, goal, [xmin, xmax, ymin, ymax],
               obstacleList, expandDis, goalSampleRate, maxIter)
     path = rrt.Planning(animation=show_animation)
 
     # Path smoothing
-
-    smoothedPath = smooth.PathSmoothing(path, maxIter, obstacleList)
-    waypoints = smooth.GenerateWaypoints(smoothedPath,z,waypoint_thresh)
+    smoothedPath = PathSmoothing(path, maxIter, obstacleList)
+    waypoints = GenerateWaypoints(smoothedPath,z,waypoint_thresh)
     print waypoints.tolist()
     # Draw final path
     if plot_final:
@@ -587,6 +544,6 @@ def main():
         plt.grid(True)
         plt.pause(0.001)
         plt.show()
-        # set_trace()
+        set_trace()
 if __name__ == '__main__':
     main()
