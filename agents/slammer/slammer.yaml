@@ -157,7 +157,10 @@ waypoint_thresh: 0.1,       # Threshold Distance to prune waypoints at the expan
 
 expandDis: .7,             # Distance to expand the RRT tree each iteration
 goalSampleRate: 20,         # Percent chance of "randomly" sampling goal for RRT
-maxIter: 700                # Number of times the path smoothing iterates
+maxIter: 700,                # Number of times the path smoothing iterates
+
+forward_threshold: 1.0,     #forward threshold for obstacle avoidance
+side_threshold: 0.6,        #threshold everywhere besides +/- 30 deg from forward
 }
 
 ### Controller Parameters

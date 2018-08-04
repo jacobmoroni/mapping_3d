@@ -7,7 +7,9 @@ from sensor_msgs.msg import LaserScan
 
 class ObstacleDetect():
     def __init__(self):
-        self.obs_thresh = 0.6
+        self.front_thresh = rospy.get_param('slammer/planner/forward_threshold',1.0)
+        self.side_thresh = rospy.get_param('slammer/planner/side_threshold',0.6)
+        self.obs_thresh = self.side_thresh
         self.replan_flag_sent = False
         
         self.nearest_obstacle_pub_ = rospy.Publisher('nearest_obstacle', Float32, queue_size=5, latch=True)
@@ -25,6 +27,10 @@ class ObstacleDetect():
         # obs_angle_deg = obs_angle*180/np.pi
         # print obs_angle_deg
         # print min(msg.ranges)
+        if abs(obs_angle)<=np.pi/6:
+            self.obs_thresh = self.front_thresh
+        else:
+            self.obs_thresh = self.side_thresh
         if min(msg.ranges) <= self.obs_thresh and not self.replan_flag_sent:
             rospy.wait_for_service('/slammer/remove_waypoint')
             try:

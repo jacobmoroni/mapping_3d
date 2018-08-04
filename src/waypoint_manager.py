@@ -38,6 +38,7 @@ class WaypointManager():
         self.obstacle_sub_ = rospy.Subscriber('nearest_obstacle',Float32, self.obstacleCallback, queue_size=5)
         self.waypoint_pub_ = rospy.Publisher('high_level_command', Command, queue_size=5, latch=True)
         self.end_waypoint_pub_ = rospy.Publisher('last_waypoint', Int16 , queue_size = 5, latch = True)
+        self.check_path_pub_ = rospy.Publisher('check_path',Int16, queue_size = 5, latch = True)
 
         # Initialize other variables
         self.current_waypoint_index = 0
@@ -72,7 +73,7 @@ class WaypointManager():
             rospy.spin()
 
     def addWaypointCallback(self,req):
-        print("addwaypoints")
+        print("AddWaypoints service called")
         new_waypoint = [req.x,req.y,req.z,req.yaw]
         self.threshold = req.radius
         self.diff_factor = req.difficulty
@@ -81,7 +82,7 @@ class WaypointManager():
         return length
 
     def removeWaypointCallback(self,req):
-        print("remove Waypoints")
+        print("removeWaypoints service called")
         self.waypoint_list = self.waypoint_list[0:self.current_waypoint_index]
         self.current_waypoint_index -= 1
         self.reset_waypoints = True
@@ -123,15 +124,14 @@ class WaypointManager():
                                                 z=current_position[2],yaw=self.current_yaw,
                                                 radius = 0.1, difficulty = 1.0)
                 if success:
-                    print "waypoint added"
                     self.current_waypoint_index +=1
             except rospy.ServiceException,e:
                 print "service call add_waypoint failed: %s" %e
             self.reset_waypoints = False
-
         if error < self.threshold:
             # Get new waypoint index
             self.current_waypoint_index += 1
+            
             if self.cyclical_path:
                 self.current_waypoint_index %= len(self.waypoint_list)
             else:
@@ -139,13 +139,17 @@ class WaypointManager():
                 if self.current_waypoint_index >= len(self.waypoint_list):
                     self.current_waypoint_index -=1
                     if not self.last_wp_published:
-                        flag = Int16()
-                        flag.data = self.planning_flag
-                        self.end_waypoint_pub_.publish(flag)
+                        obstacle_flag = Int16()
+                        obstacle_flag.data = self.planning_flag
+                        self.end_waypoint_pub_.publish(obstacle_flag)
                         self.planning_flag = 1
                     self.last_wp_published = True
                 else:
                     self.last_wp_published = False
+                    #send flag to check if path is still feasible
+                    check_path_flag = Int16()
+                    check_path_flag.data = self.current_waypoint_index
+                    self.check_path_pub_.publish(check_path_flag)
             next_waypoint = np.array(self.waypoint_list[self.current_waypoint_index])
             command_msg = Command()
             command_msg.x = next_waypoint[0]

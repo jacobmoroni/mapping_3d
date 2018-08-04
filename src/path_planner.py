@@ -11,7 +11,7 @@ from roscopter_msgs.srv import AddWaypoint, RemoveWaypoint, SetWaypointsFromFile
 from std_msgs.msg import Int16
 
 
-
+import math
 
 class MapMaker():
     """
@@ -47,16 +47,20 @@ class MapMaker():
         self.roboty = None
         self.got_tf = False
         self.obs = []
+        self.current_waypoints = None
 
         #set up publishers and subscribers
         self.listener = tf.TransformListener()
         self.last_waypoint_sub_ = rospy.Subscriber('/slammer/last_waypoint', Int16,
                 self.replanCallback, queue_size = 1)
+        self.check_path_sub_ = rospy.Subscriber('/slammer/check_path', Int16,
+                self.checkPathCallback, queue_size = 1)
         self.gridmap_sub_ = rospy.Subscriber('rtabmap/grid_map', OccupancyGrid,
                 self.gridmapCallback, queue_size=5)
 
         #set up services
         self.new_waypoint = rospy.ServiceProxy('/slammer/add_waypoint', AddWaypoint)
+        self.rm_waypoints = rospy.ServiceProxy('/slammer/remove_waypoint', RemoveWaypoint)
 
     def getTransform(self):
         """
@@ -108,7 +112,7 @@ class MapMaker():
     def replanCallback(self,msg):
         if msg.data == 1: #flag comes from waypoint planner, 1 = triggered by reaching last waypoint
             self.show_visualization = True
-            fig = plt.figure()
+            fig = plt.figure(1)
             ax = fig.add_subplot(111)
             ax.set_title('Select Goal (Close when finished)')
         elif msg.data == 2: #flac comes from waypoint planner, 2 = triggered by obstacle
@@ -130,7 +134,8 @@ class MapMaker():
 
         #initialize start position for path planning
         if self.show_visualization:
-            points, = ax.plot(robotx_g, roboty_g,"xr")  # empty points
+            points, = ax.plot(robotx_g, roboty_g,"xr")# empty points
+            plt.plot(0,0,'.r')
         else:
             points = []
 
@@ -162,7 +167,9 @@ class MapMaker():
         # Path smoothing
         smoothedPath = smooth.PathSmoothing(path, self.maxIter, obstacleList)
         waypoints = smooth.GenerateWaypoints(smoothedPath,self.z,self.waypointThresh)
-        print "Adding Waypoints: ", waypoints.tolist()
+        self.current_waypoints = waypoints
+        self.current_waypoint_idx = 0
+        print "Adding %d New Waypoints" % (len(waypoints))
         idx = 0 #index of new waypoints to be added
         while idx < len(waypoints):
             wp_cur =  waypoints[idx]
@@ -171,7 +178,6 @@ class MapMaker():
                 success = self.new_waypoint(x=wp_cur[0],y=wp_cur[1],z=wp_cur[2],yaw=wp_cur[3],
                         radius= self.thresh, difficulty = self.diff_factor)
                 if success:
-                    print "waypoint added"
                     idx +=1
             except rospy.ServiceException,e:
                 print "service call add_waypoint failed: %s" %e
@@ -186,9 +192,91 @@ class MapMaker():
             plt.plot([waypoints[:,1],waypoints[:,1]+.5*np.cos(-waypoints[:,3]+np.pi/2)],
                      [waypoints[:,0],waypoints[:,0]+.5*np.sin(-waypoints[:,3]+np.pi/2)],'-c')
             plt.grid(True)
-            plt.pause(0.001)
             plt.show()
+    def LineCollisionCheck(self,first, second, obstacleList):
+        # Uses Line Equation to check for collisions along new line made by connecting nodes
 
+        x1 = first[0]
+        y1 = first[1]
+        x2 = second[0]
+        y2 = second[1]
+
+        try:
+            a = y2 - y1
+            b = x2 - x1
+            c = x2*y1 - y2*x1
+        except ZeroDivisionError:
+            return False
+        dist = abs(a*obstacleList[:,0]-b*obstacleList[:,1]+c)/np.sqrt(a*a+b*b)-obstacleList[:,2]
+
+        #filter to only look at obstacles within range of endpoints of lines
+        prox = np.bitwise_not(np.bitwise_and(
+                np.bitwise_or(
+                    np.bitwise_and(obstacleList[:,0]<=x2 ,obstacleList[:,0]<=x1),
+                    np.bitwise_and(obstacleList[:,0]>=x2,obstacleList[:,0]>=x1)),
+                np.bitwise_or(
+                    np.bitwise_and(obstacleList[:,1]<=y2,obstacleList[:,1]<=y1),
+                    np.bitwise_and(obstacleList[:,1]>=y2,obstacleList[:,1]>=y1))))
+        
+        # fig = plt.figure(2)
+        # plt.plot([x1,x2],[y1,y2],'g')
+        # plt.plot(obstacleList[prox,0],obstacleList[prox,1],'.k')
+        # self.PlotCircle(obstacleList[prox,0],obstacleList[prox,1],obstacleList[prox,2])
+        # plt.show()
+        if dist[prox].size > 0:
+            if min(dist[prox])<=0:
+                # plt.plot([x1,x2],[y1,y2],'r')
+                return False
+            else:
+                # plt.plot([x1,x2],[y1,y2],'g')
+                return True
+ 
+    def PlotCircle(self, x, y, size):
+        deg = list(range(0, 360, 30))
+        deg.append(0)
+        xl = [x + size * math.cos(math.radians(d)) for d in deg]
+        yl = [y + size * math.sin(math.radians(d)) for d in deg]
+        plt.plot(xl, yl, "-k")
+   
+    def checkPathCallback(self,msg):
+        print msg.data
+        if self.current_waypoints is not None:
+            cwaypoints = np.array([self.current_waypoints[:,1],self.current_waypoints[:,0]]).T
+            # cur_wp = cwaypoints[self.current_waypoint_idx]
+            # if self.current_waypoint_idx < len(cwaypoints):
+                # next_wp = cwaypoints[self.current_waypoint_idx+1]
+            # else: 
+                # next_wp = cur_wp
+            
+            # nwaypoints = np.roll(cwaypoints,1,0)
+            # cwaypoints = cwaypoints[1:len(cwaypoints)]
+            # nwaypoints = nwaypoints[1:len(nwaypoints)]
+            # check = RRTSmooth()
+            
+            sizes = np.ones([1,len(self.obs)])*self.obstacleSize/2
+            obs = np.append(self.obs.T,sizes,axis=0).T
+            obs[:,0]*=-1
+            # if not check.LineCollisionCheck(cur_wp,next_wp,obs):
+                # print "need to replan"
+            for i in range(self.current_waypoint_idx,len(cwaypoints)-1):
+                first = [cwaypoints[i,0],cwaypoints[i,1],i]
+                second =  [cwaypoints[i+1,0],cwaypoints[i+1,1],i+1]
+                if not self.LineCollisionCheck(first,second,obs):
+                    rospy.wait_for_service('/slammer/remove_waypoint')
+                    try:
+                        success = self.rm_waypoints(front = True)
+                        if success:
+                            print "obstacle_detected: replan now"
+                            self.replan_flag_sent = True
+                            continue
+                    except rospy.ServiceException,e:
+                        print "service call add_waypoint failed: %s" %e
+                
+                # else:
+                    # print "obstacleDetect"
+            self.current_waypoint_idx +=1
+        else:
+            pass
 def main():
     rospy.init_node('MapMaker', anonymous=True)
     mapmaker = MapMaker()

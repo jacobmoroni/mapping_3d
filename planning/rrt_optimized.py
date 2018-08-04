@@ -62,7 +62,7 @@ y_shift = 0
 z = -1
 expandDis = 0.35
 goalSampleRate = 20
-maxIter = 1000
+maxIter = 700
 
 #parameters for full willow map
 # file = "/home/jacob/Pictures/willow_full.png" 
@@ -77,7 +77,7 @@ maxIter = 1000
 # goalSampleRate = 20
 # maxIter = 1000
 
-color_image = True 
+color_image = False 
 show_obs_size = False 
 waypoint_thresh = 0.09
 
@@ -292,33 +292,85 @@ def PathSmoothing(path, maxIter, obstacleList):
     le = GetPathLength(path)
     
     #randomly sample maxIter times to smooth path
-    for i in range(maxIter):
-        # Sample two points
-        pickPoints = [random.uniform(0, le), random.uniform(0, le)]
-        pickPoints.sort()
-        first = GetTargetPoint(path, pickPoints[0])
-        second = GetTargetPoint(path, pickPoints[1])
+    pidx = 0
+    while pidx < len(path)-1:
+        # set_trace()
+        pidx +=1
+        for i in range(1,len(path)-pidx):
+            first = [path[pidx][0],path[pidx][1],pidx]
+            second = [path[len(path)-i][0],path[len(path)-i][1],len(path)-i]
+            if not LineCollisionCheck(first,second,obstacleList):
+                continue
+                if first[2]+1 == second[2]:
+                    # pidx+=1
+                    set_trace()
+            else:
+                # Create New path
+                newPath = []
+                newPath.extend(path[:first[2] + 1])
+                # newPath.append([first[0], first[1]])
+                newPath.append([second[0], second[1]])
+                newPath.extend(path[second[2] + 1:])
+                path = newPath
+                # pidx +=1
+                break
+    # for i in range(maxIter):
+        # # Sample two points
+        # print len(path)
+        # pickPoints = [random.randint(0, len(path)-1), random.randint(0, len(path)-1)]
+        # pickPoints.sort()
+        # first = [path[pickPoints[0]][0],path[pickPoints[0]][1],pickPoints[0]]
+        # second = [path[pickPoints[1]][0],path[pickPoints[1]][1],pickPoints[1]] 
 
-        if first[2] <= 0 or second[2] <= 0:
-            continue
+        # # if first[2] <= 0 or second[2] <= 0:
+            # # continue
 
-        if (second[2] + 1) > len(path):
-            continue
+        # if (second[2] + 1) > len(path):
+            # continue
 
-        if second[2] == first[2]:
-            continue
+        # if second[2] == first[2]:
+            # continue
 
-        # collision check
-        if not LineCollisionCheck(first, second, obstacleList):
-            continue
-        # Create New path
-        newPath = []
-        newPath.extend(path[:first[2] + 1])
-        newPath.append([first[0], first[1]])
-        newPath.append([second[0], second[1]])
-        newPath.extend(path[second[2] + 1:])
-        path = newPath
-        le = GetPathLength(path)
+        # # collision check
+        # if not LineCollisionCheck(first, second, obstacleList):
+            # continue
+        # # Create New path
+        # newPath = []
+        # newPath.extend(path[:first[2] + 1])
+        # # newPath.append([first[0], first[1]])
+        # newPath.append([second[0], second[1]])
+        # newPath.extend(path[second[2] + 1:])
+        # path = newPath
+        # le = GetPathLength(path)
+    
+    # #randomly sample maxIter times to smooth path
+    # for i in range(maxIter):
+        # # Sample two points
+        # pickPoints = [random.uniform(0, le), random.uniform(0, le)]
+        # pickPoints.sort()
+        # first = GetTargetPoint(path, pickPoints[0])
+        # second = GetTargetPoint(path, pickPoints[1])
+
+        # if first[2] <= 0 or second[2] <= 0:
+            # continue
+
+        # if (second[2] + 1) > len(path):
+            # continue
+
+        # if second[2] == first[2]:
+            # continue
+
+        # # collision check
+        # if not LineCollisionCheck(first, second, obstacleList):
+            # continue
+        # # Create New path
+        # newPath = []
+        # newPath.extend(path[:first[2] + 1])
+        # newPath.append([first[0], first[1]])
+        # newPath.append([second[0], second[1]])
+        # newPath.extend(path[second[2] + 1:])
+        # path = newPath
+        # le = GetPathLength(path)
 
     return path
 
@@ -516,6 +568,6 @@ def main():
         plt.grid(True)
         plt.pause(0.001)
         plt.show()
-        set_trace()
+        # set_trace()
 if __name__ == '__main__':
     main()

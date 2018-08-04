@@ -92,7 +92,6 @@ class RRTSearch:
 
             # Find nearest node
             nind = self.GetNearestListIndex(self.nodeList, rnd)
-            # print(nind)
 
             # expand tree
             nearestNode = self.nodeList[nind]
@@ -109,14 +108,12 @@ class RRTSearch:
             self.nodeList.append(newNode)
 
             if self.LineCollisionCheck(newNode,self.goal,self.obstacleList):
-                print ("line to goal")
                 break
             # check goal
             dx = newNode[0] - self.goal[0]
             dy = newNode[1] - self.goal[1]
             d = math.sqrt(dx * dx + dy * dy)
             if d <= self.expandDis:
-                print("Goal!!")
                 break
 
             if animation:
@@ -154,7 +151,7 @@ class RRTSearch:
         plt.ylim(self.minyrand,self.maxyrand)
         plt.axis('scaled')
         plt.grid(True)
-        plt.pause(0.01)
+        # plt.pause(0.01)
 
     def PlotCircle(self, x, y, size):
         deg = list(range(0, 360, 30))
@@ -271,7 +268,10 @@ class RRTSmooth:
                 np.bitwise_or(
                     np.bitwise_and(obstacleList[:,1]<=y2,obstacleList[:,1]<=y1),
                     np.bitwise_and(obstacleList[:,1]>=y2,obstacleList[:,1]>=y1))))
-
+        
+        # plt.plot([x1,x2],[y1,y2],'g')
+        # plt.plot(obstacleList[prox,0],obstacleList[prox,1],'.k')
+        # plt.show()
         if dist[prox].size > 0:
             if min(dist[prox])<=0:
                 return False
@@ -279,37 +279,68 @@ class RRTSmooth:
                 return True
 
     def PathSmoothing(self, path, maxIter, obstacleList):
-        print "PathSmoothing"
+        print "Smoothing Path"
         le = self.GetPathLength(path)
 
+        
+        pidx = 0
+        while pidx < len(path)-1:
+            # set_trace()
+            pidx +=1
+            for i in range(1,len(path)-pidx):
+                first = [path[pidx][0],path[pidx][1],pidx]
+                second = [path[len(path)-i][0],path[len(path)-i][1],len(path)-i]
+                if not self.LineCollisionCheck(first,second,obstacleList):
+                    continue
+                    if first[2]+1 == second[2]:
+                        # pidx+=1
+                        set_trace()
+                else:
+                    # Create New path
+                    newPath = []
+                    newPath.extend(path[:first[2] + 1])
+                    # newPath.append([first[0], first[1]])
+                    newPath.append([second[0], second[1]])
+                    newPath.extend(path[second[2] + 1:])
+                    path = newPath
+                    # pidx +=1
+                    break
+        
         #randomly sample maxIter times to smooth path
-        for i in range(maxIter):
-            # Sample two points
-            pickPoints = [random.uniform(0, le), random.uniform(0, le)]
-            pickPoints.sort()
-            first = self.GetTargetPoint(path, pickPoints[0])
-            second = self.GetTargetPoint(path, pickPoints[1])
+        # for i in range(maxIter):
 
-            if first[2] <= 0 or second[2] <= 0:
-                continue
+            # # Sample two points
+            # pickPoints = [random.randint(0, len(path)-1), random.randint(0, len(path)-1)]
+            # pickPoints.sort()
+            # first = [path[pickPoints[0]][0],path[pickPoints[0]][1],pickPoints[0]]
+            # second = [path[pickPoints[1]][0],path[pickPoints[1]][1],pickPoints[1]] 
+            
+            # # # Sample two points
+            # # pickPoints = [random.uniform(0, le), random.uniform(0, le)]
+            # # pickPoints.sort()
+            # # first = self.GetTargetPoint(path, pickPoints[0])
+            # # second = self.GetTargetPoint(path, pickPoints[1])
 
-            if (second[2] + 1) > len(path):
-                continue
+            # # if first[2] <= 0 or second[2] <= 0:
+                # # continue
 
-            if second[2] == first[2]:
-                continue
+            # if (second[2] + 1) > len(path):
+                # continue
 
-            # collision check
-            if not self.LineCollisionCheck(first, second, obstacleList):
-                continue
-            # Create New path
-            newPath = []
-            newPath.extend(path[:first[2] + 1])
-            newPath.append([first[0], first[1]])
-            newPath.append([second[0], second[1]])
-            newPath.extend(path[second[2] + 1:])
-            path = newPath
-            le = self.GetPathLength(path)
+            # if second[2] == first[2]:
+                # continue
+
+            # # collision check
+            # if not self.LineCollisionCheck(first, second, obstacleList):
+                # continue
+            # # Create New path
+            # newPath = []
+            # newPath.extend(path[:first[2] + 1])
+            # # newPath.append([first[0], first[1]])
+            # newPath.append([second[0], second[1]])
+            # newPath.extend(path[second[2] + 1:])
+            # path = newPath
+            # le = self.GetPathLength(path)
 
         return path
 
@@ -334,7 +365,8 @@ class RRTSmooth:
 
         #current waypoint follower goes to psi delayed be 1 waypoint so shift psi back by 1
         angle_path = np.roll(angle_path,-1,0)
-        angle_path[-1] = angle_path[-2]
+        if len(angle_path)>1:
+            angle_path[-1] = angle_path[-2]
 
 
         #waypoints are [N,E,D,psi]
@@ -346,7 +378,6 @@ class GenerateMap:
     def __init__(self, points, file, px_conv, bw_thresh, obstacleSize, unknown_as_obs, show_obs_size,
                 show_visualization, theta, x_shift, y_shift, pre_gen_obs, robotx_g, roboty_g):
         # Pass in None as file to use obstacles generated from ROS
-
         self.points = points
         self.show_visualization = show_visualization
         if self.show_visualization:
@@ -379,11 +410,6 @@ class GenerateMap:
         self.xmax = max(self.obs[:,0])
         self.ymin = min(self.obs[:,1])
         self.ymax = max(self.obs[:,1])
-
-        print "xmin: ",self.xmin
-        print "xmax: ",self.xmax
-        print "ymin: ",self.ymin
-        print "ymax: ",self.ymax
 
         if self.show_visualization:
             self.xs = [self.xmin,self.ymin]
@@ -494,7 +520,7 @@ class GenerateMap:
         plt.ylim(self.ymin,self.ymax)
         plt.axis('scaled')
         plt.grid(True)
-        plt.pause(0.01)
+        # plt.pause(0.01)
 
     def PlotCircle(self, x, y, size):
         deg = list(range(0, 360, 30))
@@ -530,7 +556,6 @@ def main():
     # Path smoothing
     smoothedPath = PathSmoothing(path, maxIter, obstacleList)
     waypoints = GenerateWaypoints(smoothedPath,z,waypoint_thresh)
-    print waypoints.tolist()
     # Draw final path
     if plot_final:
         rrt.DrawGraph()
