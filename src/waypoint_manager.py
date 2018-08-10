@@ -42,8 +42,6 @@ class WaypointManager():
 
         # Initialize other variables
         self.current_waypoint_index = 0
-        self.reset_waypoints = False        #This flag turns true when waypoints are being cleared out
-                                            #   to trigger generating a new waypoint
         self.current_yaw = 0.0              #when making a new waypoint, after clearing old waypoints,
                                             #   use same yaw
         self.planning_flag = 1              #this flag is published and used by path planner to decide
@@ -83,9 +81,10 @@ class WaypointManager():
 
     def removeWaypointCallback(self,req):
         print("removeWaypoints service called")
-        self.waypoint_list = self.waypoint_list[0:self.current_waypoint_index]
-        self.current_waypoint_index -= 1
-        self.reset_waypoints = True
+        # self.waypoint_list = self.waypoint_list[0:self.current_waypoint_index]
+        self.waypoint_list =[]
+        self.current_waypoint_index = 0
+        self.resetWaypoints()
         if req.front == True:
             self.planning_flag = 2 #Dont visualize replan
         length = len(self.waypoint_list)
@@ -94,40 +93,42 @@ class WaypointManager():
     def setWaypointsFromFile(req):
         print("set Waypoints from File")
         #not set up yet
-
+    
+    def resetWaypoints(self):
+        command_msg = Command()
+        command_msg.x = self.pos[0]-self.obstacle_offset*np.cos(self.obstacle_angle)
+        command_msg.y = self.pos[1]-self.obstacle_offset*np.sin(self.obstacle_angle)
+        command_msg.F = self.pos[2]
+        command_msg.z = self.current_yaw
+        command_msg.mode = Command.MODE_XPOS_YPOS_YAW_ALTITUDE
+        self.waypoint_pub_.publish(command_msg)
+        rospy.wait_for_service('/slammer/add_waypoint')
+        try:
+            success = self.new_waypoint(x=self.pos[0],y=self.pos[1],
+                                            z=self.pos[2],yaw=self.current_yaw,
+                                            radius = 0.1, difficulty = 1.0)
+            if success:
+                pass
+        except rospy.ServiceException,e:
+            print "service call add_waypoint failed: %s" %e
+            
     def obstacleCallback(self,msg):
         self.obstacle_angle = -msg.data #current angle (converts to NED)
 
     def odometryCallback(self, msg):
         # Get error between waypoint and current state
-        current_waypoint = np.array(self.waypoint_list[self.current_waypoint_index])
+        if len(self.waypoint_list)==0:
+            current_waypoint = [np.inf,np.inf,np.inf]
+        else:
+            current_waypoint = np.array(self.waypoint_list[self.current_waypoint_index])
         (r, p, y) = tf.transformations.euler_from_quaternion([msg.pose.pose.orientation.x,
             msg.pose.pose.orientation.y, msg.pose.pose.orientation.z, msg.pose.pose.orientation.w])
         current_position = np.array([msg.pose.pose.position.x,
                                      msg.pose.pose.position.y,
                                      msg.pose.pose.position.z])
-
+        self.pos = current_position
         error = np.linalg.norm(current_position - current_waypoint[0:3])
 
-        #If reset_waypoints is triggered, make a new waypoint to stay at until new path is planned
-        if self.reset_waypoints:
-            command_msg = Command()
-            command_msg.x = current_position[0]-self.obstacle_offset*np.cos(self.obstacle_angle)
-            command_msg.y = current_position[1]-self.obstacle_offset*np.sin(self.obstacle_angle)
-            command_msg.F = current_position[2]
-            command_msg.z = self.current_yaw
-            command_msg.mode = Command.MODE_XPOS_YPOS_YAW_ALTITUDE
-            self.waypoint_pub_.publish(command_msg)
-            rospy.wait_for_service('/slammer/add_waypoint')
-            try:
-                success = self.new_waypoint(x=current_position[0],y=current_position[1],
-                                                z=current_position[2],yaw=self.current_yaw,
-                                                radius = 0.1, difficulty = 1.0)
-                if success:
-                    self.current_waypoint_index +=1
-            except rospy.ServiceException,e:
-                print "service call add_waypoint failed: %s" %e
-            self.reset_waypoints = False
         if error < self.threshold:
             # Get new waypoint index
             self.current_waypoint_index += 1

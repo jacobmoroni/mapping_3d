@@ -52,7 +52,7 @@ plot_final = True
 # goalSampleRate = 20
 # maxIter = 1000
 
-file = "/home/jacob/Pictures/willow_garage_edit.png" 
+file = "/home/jacob/Pictures/RRT_planning/willow_garage_edit.png" 
 obstacleSize = .3 
 bw_thresh = 10 
 px_conv = 0.05
