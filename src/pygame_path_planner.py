@@ -11,8 +11,7 @@ from roscopter_msgs.srv import AddWaypoint, RemoveWaypoint, SetWaypointsFromFile
 from std_msgs.msg import Int16
 import pygame
 
-pygame.init()
-import math
+
 
 
 class MapMaker():
@@ -64,21 +63,47 @@ class MapMaker():
         self.screen = pygame.display.set_mode(self.screen_size)
         self.counter = 0
 
+        #initiate pygame
+        pygame.init()
+        pygame.display.set_caption('Path Planner')
+        
         #pygame colors
+        self.color_inactive = pygame.Color('lightskyblue3')
+        self.color_active = pygame.Color('dodgerblue2')
         self.black = (0,0,0)
         self.white = (255,255,255)
         self.red = (255,0,0)
         self.green = (0,255,0)
         self.blue = (0,0,255)
         self.grey = (100,100,100)
+        
+        self.input_box_x = pygame.Rect(1,1,1,1)
+        self.type_active_x = False
+        self.xcolor_box = self.color_inactive
+        self.xtext = ''
+        
+        self.input_box_y = pygame.Rect(1,1,1,1)
+        self.type_active_y = False
+        self.ycolor_box = self.color_inactive
+        self.ytext = ''
+
 
         #initialize flags
         self.got_tf = False
         self.plot_now_flag = False
+        self.text_now_flag = False
         self.bad_path = False
         self.wp_add_done = True
         self.choose_goal = False
 
+        #pygame uav_pointer
+        self.psi = 0
+        self.tip = 10
+        self.base = 1
+        self.side = 10
+        self.side_ang = 3*np.pi/4
+
+        
         #set up publishers and subscribers
         self.listener = tf.TransformListener()
         self.last_waypoint_sub_ = rospy.Subscriber('/slammer/last_waypoint', Int16,
@@ -136,16 +161,59 @@ class MapMaker():
         event = pygame.event.poll()
         #do this when the left mouse button is clicked
         if event.type == pygame.MOUSEBUTTONDOWN and event.button == 1:
-            self.clickx,self.clicky = event.pos
-            self.plot_now_flag = True
+            if not self.input_box_x.collidepoint(event.pos) and not self.input_box_y.collidepoint(event.pos):
+                self.clickx,self.clicky = event.pos
+                self.plot_now_flag = True
+                self.text_now_flag = True 
         
         if self.choose_goal == True:
+            if event.type == pygame.MOUSEBUTTONDOWN:
+                if self.input_box_x.collidepoint(event.pos):
+                    self.type_active_x = not self.type_active_x
+                    self.type_active_y = False
+                elif self.input_box_y.collidepoint(event.pos):
+                    self.type_active_y = not self.type_active_y
+                    self.type_active_x = False
+                else:
+                    self.type_active_x = False
+                    self.type_active_y = False
+                self.xcolor_box = self.color_active if self.type_active_x else self.color_inactive
+                self.ycolor_box = self.color_active if self.type_active_y else self.color_inactive
+                self.text_now_flag = True
+            if event.type == pygame.KEYDOWN:
+                if self.type_active_x:
+                    if event.key == pygame.K_SPACE or event.key == pygame.K_KP_ENTER:
+                        try: 
+                            self.clickx = int((float(self.xtext)-self.xmin)/self.reso + self.pbuff)
+                            self.goalx = ((self.reso*(self.clickx-self.pbuff))+self.xmin)
+                            self.xtext = str(self.goalx)
+                        except ValueError:
+                            self.xtext = 'nope'
+                    elif event.key == pygame.K_BACKSPACE:
+                        self.xtext = self.xtext[:-1]
+                    else:
+                        self.xtext += event.unicode
+                if self.type_active_y:
+                    if event.key == pygame.K_SPACE or event.key == pygame.K_KP_ENTER:
+                        try: 
+                            self.clicky = int((-float(self.ytext)+self.ymax)/self.reso + self.pbuff)
+                            self.ytext = str(self.goaly)
+                        except ValueError:
+                            self.ytext = 'nope'
+                    elif event.key == pygame.K_BACKSPACE:
+                        self.ytext = self.ytext[:-1]
+                    else:
+                        self.ytext += event.unicode
+                    self.text_now_flag = True
+
             #do this if ENTER/RETURN is pressed
             if event.type == pygame.KEYDOWN and event.key == pygame.K_RETURN:
                 self.choose_goal = False
         #this is where the plotting happens, runs every self.update_plot_timer ms 
         #   or when plot_now_flag is thrown
         if self.counter > self.update_plot_timer or self.plot_now_flag == True:
+            self.input_box_x = pygame.Rect(25,self.screen_size[1]-25,100,20)
+            self.input_box_y = pygame.Rect(150,self.screen_size[1]-25,100,20)
             self.goalx = ((self.reso*(self.clickx-self.pbuff))+self.xmin)
             self.goaly = -((self.reso*(self.clicky-self.pbuff))-self.ymax)
             self.getTransform()
@@ -177,17 +245,36 @@ class MapMaker():
             pygame.draw.circle(self.screen,self.red,(self.clickx,self.clicky), 5,0)
             #plot current robot location
             if self.robotx is not None:
-                pygame.draw.circle(self.screen,self.green,
-                    (int((-self.roboty-self.xmin)/self.reso+self.pbuff),
-                     int((-self.robotx+self.ymax)/self.reso+self.pbuff)),5,0)
+                x = int((-self.roboty-self.xmin)/self.reso+self.pbuff)
+                y = int((-self.robotx+self.ymax)/self.reso+self.pbuff)
+                psi_p =(self.psi+np.pi/2)
+                pointlist = np.rint([[x+self.tip*np.cos(psi_p),y-self.tip*np.sin(psi_p)],
+                        [x+self.side*np.cos(psi_p+self.side_ang),y-self.side*np.sin(psi_p+self.side_ang)],
+                        [x-self.base*np.cos(psi_p),y+self.base*np.sin(psi_p)],
+                        [x+self.side*np.cos(psi_p-self.side_ang),y-self.side*np.sin(psi_p-self.side_ang)]])
+                pygame.draw.polygon(self.screen,self.green,pointlist,0)
+                # pygame.draw.circle(self.screen,self.green,
+                    # (int((-self.roboty-self.xmin)/self.reso+self.pbuff),
+                     # int((-self.robotx+self.ymax)/self.reso+self.pbuff)),5,0)
             #display goal location
+
+            self.counter = 0
+            self.plot_now_flag = False
+        
+        # if self.text_now_flag:
             self.messageDisplay("Goal Location: %f , %f" % (self.goalx,self.goaly),[10,10])
             #display "select goal" message
             if self.choose_goal == True:
                 self.messageDisplay("Select new goal press enter when done",[25,10])
-            self.counter = 0
-            self.plot_now_flag = False
-        
+                self.messageDisplay("Or manualy enter new goal and press space to submit",
+                        [self.screen_size[1]-50,5])
+                self.messageDisplay("x:",[self.screen_size[1]-25,10])
+                self.messageDisplay("y:",[self.screen_size[1]-25,130])
+                self.messageDisplay(self.xtext,[self.input_box_x.y+5,self.input_box_x.x+5])
+                pygame.draw.rect(self.screen,self.xcolor_box,self.input_box_x,2)
+                self.messageDisplay(self.ytext,[self.input_box_y.y+5,self.input_box_y.x+5])
+                pygame.draw.rect(self.screen,self.ycolor_box,self.input_box_y,2)
+            # self.text_now_flag = False
         pygame.display.flip()
         self.counter +=1
 
@@ -201,6 +288,8 @@ class MapMaker():
             self.got_tf = True
             self.robotx = trans[0]
             self.roboty = trans[1]
+            euler = tf.transformations.euler_from_quaternion(rot)
+            self.psi = euler[2]
         except (tf.LookupException, tf.ConnectivityException, tf.ExtrapolationException):
             rospy.logwarn("cannot get tf transform")
             self.got_tf = False

@@ -158,11 +158,12 @@ class WaypointManager():
             command_msg.F = next_waypoint[2]
             if len(current_waypoint) > 3:
                 command_msg.z = current_waypoint[3]
+                self.current_yaw = command_msg.z
             else:
                 next_point = self.waypoint_list[(self.current_waypoint_index + 1) % len(self.waypoint_list)]
                 delta = next_point - current_waypoint
                 command_msg.z = np.atan2(delta[1], delta[0])
-                self.current_yaw = command_msg.z
+
             command_msg.mode = Command.MODE_XPOS_YPOS_YAW_ALTITUDE
             self.waypoint_pub_.publish(command_msg)
 
