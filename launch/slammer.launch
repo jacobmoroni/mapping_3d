@@ -33,7 +33,7 @@
 
     <!--Launch Realsense and RTAB Map-->
   <include file="$(find mapping_3d)/launch/slammer_rtab.launch"/>
-  <node name="path_planner" pkg="mapping_3d" type="path_planner.py" output="screen"/>
+  <node name="path_planner" pkg="mapping_3d" type="pygame_path_planner.py" output="screen"/>
   <node name="obstacle_detection" pkg="mapping_3d" type="obstacle_detect.py" output="screen"/>
     <!-- VO -->
     <!-- <group if="$(arg run_rgbd)">
@@ -63,7 +63,8 @@
    <!--</node>-->
    <!--<node name="mocap_NED_transform" pkg="vrpn_transform" type="vrpn_transform_node"/>-->
 
-    <!--Record
-     <node name ="record" pkg="rosbag" type ="record" args="-O $(arg name) camera/aligned_depth_to_color/image_raw/compressedDepth camera/color/image_rect_color/compressed camera/color/camera_info camera/depth/camera_info /tf /tf_static" output="screen"/>
-  -->
+    <!--Record-->
+     <!--<node name ="record" pkg="rosbag" type ="record" args="-O $(arg name) camera/aligned_depth_to_color/image_raw/compressedDepth camera/color/image_rect_color/compressed camera/color/camera_info camera/depth/camera_info /tf /tf_static" output="screen"/>-->
+  
+     <!--<node name ="record" pkg="rosbag" type ="record" args="-O $(arg name) /rtabmap/odom" output="screen"/>-->
   </launch>

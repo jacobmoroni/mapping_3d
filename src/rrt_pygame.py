@@ -6,7 +6,7 @@ based off of code written by AtsushiSakai(@Atsushi_twi)
 
 """
 
-import matplotlib.pyplot as plt
+# import matplotlib.pyplot as plt
 import pygame
 import random
 import math
@@ -81,8 +81,9 @@ class RRTSearch:
         while True:
             if first_time:
                 if show_visualization:
+                    pass
                     #Replot before starting
-                    self.DrawGraph()
+                    # self.DrawGraph()
                 first_time = False
 
             # Random Sampling
@@ -122,7 +123,8 @@ class RRTSearch:
                 break
             # print i
             if animation:
-                self.DrawGraph(rnd)
+                pass
+                # self.DrawGraph(rnd)
             i += 1
         #add nodes in final path to path variable
         path = [[self.goal[0], self.goal[1]]]
@@ -136,7 +138,7 @@ class RRTSearch:
         return path
 
     def DrawGraph(self, rnd=None):
-        plt.clf()
+        # plt.clf()
         if rnd is not None:
             plt.plot(rnd[0], rnd[1], "^k")
 

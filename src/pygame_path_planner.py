@@ -2,7 +2,7 @@
 import numpy as np
 import rospy, tf
 import cv2
-import matplotlib.pyplot as plt
+# import matplotlib.pyplot as plt
 from nav_msgs.msg import Odometry, OccupancyGrid, MapMetaData
 from tf.transformations import euler_from_quaternion
 import tf
@@ -186,7 +186,7 @@ class MapMaker():
                         try: 
                             self.clickx = int((float(self.xtext)-self.xmin)/self.reso + self.pbuff)
                             self.goalx = ((self.reso*(self.clickx-self.pbuff))+self.xmin)
-                            self.xtext = str(self.goalx)
+                            self.xtext = str(round(self.goalx,3))
                         except ValueError:
                             self.xtext = 'nope'
                     elif event.key == pygame.K_BACKSPACE:
@@ -197,7 +197,7 @@ class MapMaker():
                     if event.key == pygame.K_SPACE or event.key == pygame.K_KP_ENTER:
                         try: 
                             self.clicky = int((-float(self.ytext)+self.ymax)/self.reso + self.pbuff)
-                            self.ytext = str(self.goaly)
+                            self.ytext = str(round(self.goaly,3))
                         except ValueError:
                             self.ytext = 'nope'
                     elif event.key == pygame.K_BACKSPACE:
@@ -268,8 +268,8 @@ class MapMaker():
                 self.messageDisplay("Select new goal press enter when done",[25,10])
                 self.messageDisplay("Or manualy enter new goal and press space to submit",
                         [self.screen_size[1]-50,5])
-                self.messageDisplay("x:",[self.screen_size[1]-25,10])
-                self.messageDisplay("y:",[self.screen_size[1]-25,130])
+                self.messageDisplay("x:",[self.screen_size[1]-20,10])
+                self.messageDisplay("y:",[self.screen_size[1]-20,130])
                 self.messageDisplay(self.xtext,[self.input_box_x.y+5,self.input_box_x.x+5])
                 pygame.draw.rect(self.screen,self.xcolor_box,self.input_box_x,2)
                 self.messageDisplay(self.ytext,[self.input_box_y.y+5,self.input_box_y.x+5])
@@ -346,9 +346,9 @@ class MapMaker():
         '''
         if msg.data == 1: 
             self.show_visualization = True
-            fig = plt.figure(1)
-            ax = fig.add_subplot(111)
-            ax.set_title('Select Goal (Close when finished)')
+            # fig = plt.figure(1)
+            # ax = fig.add_subplot(111)
+            # ax.set_title('Select Goal (Close when finished)')
         elif msg.data == 2: 
             self.show_visualization = False
         self.getTransform()
